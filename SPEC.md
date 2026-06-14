@@ -63,18 +63,25 @@ conditionals, subshells/functions, variables, command substitution, and loops.
 
 ## 2. How dot text becomes a program
 
-```
- ┌────────────┐   parse    ┌───────────┐   extract    ┌────────────────┐
- │ foo.dot    │ ─────────▶ │ dot AST   │ ───────────▶ │ execution graph│
- │ (any dot)  │            │           │  (§3)        │ (nodes/edges/  │
- └────────────┘            └───────────┘              │  ports/roles)  │
-        │                        │                     └───────┬────────┘
-        │ dot -Tpng              │ gl_* + topology              │ check (§9)
-        ▼                        ▼                              ▼
-   a picture                a picture                   ┌────────────────┐
-                                                        │ bash script    │
-                                                        │  (the meaning) │
-                                                        └────────────────┘
+```dot
+digraph how_dot_becomes_a_program {
+    rankdir=LR;
+    node [shape=box, fontname="monospace"];
+
+    src      [label="foo.dot\n(any dot)"];
+    ast      [label="dot AST"];
+    exec     [label="execution graph\n(nodes/edges/\nports/roles)"];
+    bash     [label="bash script\n(the meaning)"];
+    pic_src  [label="a picture", shape=note];
+    pic_ast  [label="a picture", shape=note];
+
+    src  -> ast  [label="parse"];
+    ast  -> exec [label="extract (§3)"];
+    exec -> bash [label="check (§9)"];
+
+    src  -> pic_src [label="dot -Tpng",        style=dashed];
+    ast  -> pic_ast [label="gl_* + topology",  style=dashed];
+}
 ```
 
 `gripeline run foo.dot` =
