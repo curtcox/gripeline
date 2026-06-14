@@ -21,5 +21,19 @@ digraph {                       // cat access.log | grep 404 | wc -l
 - **[tests/](tests/)** — a conformance harness and fixtures that validate a
   transpiler (`python3 tests/run.py`). See [tests/README.md](tests/README.md).
 
-Status: design draft. The spec defines the language; the transpiler is not built
-yet, but the test harness already validates every example.
+Status: design draft with a working transpiler. [`gripeline.py`](gripeline.py)
+(Python 3, standard library only) parses real `dot`, resolves roles, runs the
+§9 static check, and emits `bash`. Run it via the [`gripeline`](gripeline) shim:
+
+```bash
+./gripeline build foo.dot     # print transpiled bash to stdout
+./gripeline run   foo.dot     # transpile then exec under bash
+./gripeline check foo.dot     # §9 static check only (exit 0, or 65 if not executable)
+```
+
+The conformance harness passes under either invocation form:
+
+```bash
+GRIPELINE=./gripeline            python3 tests/run.py
+GRIPELINE='python3 gripeline.py' python3 tests/run.py
+```
