@@ -1,0 +1,15 @@
+name: 12.9-for-loop
+mapping: typed
+spec: 12.9
+expect: contains
+=== dot ===
+digraph {
+  subgraph cluster_each {
+    gl_loop="for f in *.txt"
+    z[label="gzip -k \"$f\""]
+  }
+}
+=== bash ===
+for f in *.txt
+gzip -k "$f"
+done

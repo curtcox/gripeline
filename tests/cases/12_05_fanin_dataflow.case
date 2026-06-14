@@ -1,0 +1,14 @@
+name: 12.5-fanin-dataflow
+mapping: dataflow
+spec: 12.5
+expect: contains
+=== dot ===
+digraph { gl_mapping="dataflow"
+  m1 -> merged [label="curl -s host1/metrics"]
+  m2 -> merged [label="curl -s host2/metrics"]
+  merged -> counted [label="sort | uniq -c"]
+}
+=== bash ===
+curl -s host1/metrics
+curl -s host2/metrics
+sort | uniq -c

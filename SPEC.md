@@ -1,6 +1,6 @@
 # gripeline — a specification for executing Graphviz `dot` files as shell pipelines
 
-**Status:** Draft 0.1 (design exploration)
+**Status:** Draft 0.2 (design exploration)
 **Source language:** unmodified Graphviz `dot`
 **Execution model:** transpile to `bash`
 **Scope:** pipes, files, file-descriptor routing, fan-out/fan-in, sequencing &
@@ -18,10 +18,10 @@ conditionals, subshells/functions, variables, command substitution, and loops.
 2. [How dot text becomes a program](#2-how-dot-text-becomes-a-program)
 3. [The execution graph vs. the rendering attributes](#3-the-execution-graph-vs-the-rendering-attributes)
 4. [Three mappings (and how they relate)](#4-three-mappings)
-   - [4.1 Mapping A — nodes are programs](#41-mapping-a--nodes-are-programs-edges-are-pipes)
-   - [4.2 Mapping B — nodes are data](#42-mapping-b--nodes-are-data-edges-are-programs)
-   - [4.3 Mapping C — hybrid / typed nodes](#43-mapping-c--hybrid-typed-nodes-the-general-model)
-   - [4.4 Picking a mapping per file](#44-declaring-the-mapping)
+   - [4.1 The Commands mapping](#41-the-commands-mapping--nodes-are-programs-edges-are-pipes)
+   - [4.2 The Dataflow mapping](#42-the-dataflow-mapping--nodes-are-data-edges-are-programs)
+   - [4.3 The Typed mapping](#43-the-typed-mapping--typed-nodes-the-general-model)
+   - [4.4 Declaring the mapping](#44-declaring-the-mapping)
 5. [File descriptors and ports](#5-file-descriptors-and-ports)
 6. [Control flow: sequencing, conditionals, grouping](#6-control-flow)
 7. [Variables and command substitution](#7-variables-and-command-substitution)
@@ -30,7 +30,7 @@ conditionals, subshells/functions, variables, command substitution, and loops.
 10. [Reserved attribute reference](#10-reserved-attribute-reference)
 11. [Conformance](#11-conformance)
 12. [Example gallery (bash ⇄ all three mappings)](#12-example-gallery)
-13. [Open questions](#13-open-questions)
+13. [Resolved decisions and open questions](#13-resolved-decisions-and-open-questions)
 
 ---
 
@@ -106,7 +106,8 @@ the second.
 - Node identities, the nesting of `subgraph`/`cluster` blocks.
 - Edge endpoints and their **ports** (`a:1 -> b:0`).
 - A node's **operation text**, taken from `label` if present, else the node id.
-- An edge's **operation text** (used by Mapping B), taken from its `label`.
+- An edge's **operation text** (used by the Dataflow mapping), taken from its
+  `label`.
 - The reserved `gl_*` attributes (§10) and the role-bearing `shape` values.
 
 **Rendering-only (ignored by execution):**
@@ -143,30 +144,39 @@ convention, but conforming default behavior reads only `gl_*` + topology.
 ## 4. Three mappings
 
 The same shell concepts — **programs**, **streams/files**, **the wiring between
-them** — can be assigned to dot's **nodes** and **edges** in three ways. They are
-not three different languages; they are three *conventions* over the same file
-format, and they interoperate through one underlying model (Mapping C).
+them** — can be assigned to dot's **nodes** and **edges** in three ways, which
+this spec names by what a *node* represents:
+
+| mapping        | a **node** is…        | an **edge** is…   | best at                         |
+|----------------|-----------------------|-------------------|---------------------------------|
+| **Commands**   | a program             | a pipe            | straight pipelines (the 90%)    |
+| **Dataflow**   | a value / stream      | a program (label) | reuse, fan-out, variables       |
+| **Typed**      | a typed thing (role)  | role-dependent    | everything; the general model   |
+
+They are not three different languages; they are three *conventions* over the
+same file format, and they interoperate through one underlying model (the Typed
+mapping).
 
 Quick taste, all computing `cat access.log | grep 404 | wc -l`:
 
 ```dot
-/* A: nodes are programs, arrows are pipes */
+/* Commands: nodes are programs, arrows are pipes */
 digraph { a[label="cat access.log"] b[label="grep 404"] c[label="wc -l"]
           a -> b -> c }
 ```
 ```dot
-/* B: nodes are data, arrows are programs (labels) */
+/* Dataflow: nodes are data, arrows are programs (labels) */
 digraph { log -> hits [label="grep 404"]; hits -> n [label="wc -l"]
-          log [label="access.log"] }
+          log [shape=note,label="access.log"] }
 ```
 ```dot
-/* C: typed nodes; files are first-class, programs are boxes */
+/* Typed: typed nodes; files are first-class, programs are boxes */
 digraph { log [shape=note,label="access.log"]
           grep[label="grep 404"] wc[label="wc -l"]
           log -> grep -> wc }
 ```
 
-### 4.1 Mapping A — nodes are programs, edges are pipes
+### 4.1 The Commands mapping — nodes are programs, edges are pipes
 
 The literal pipeline. The thing you see in the boxes is the command; the arrow is
 the `|`.
@@ -193,22 +203,24 @@ most directly answers "make it look like a bash pipeline."
 digraph {                       // grep 404 < access.log | wc -l > counts.txt
   log    [shape=note,label="access.log"]
   counts [shape=note,label="counts.txt"]
-  log -> grep[label="grep 404"] -> wc[label="wc -l"] -> counts
+  grep   [label="grep 404"]
+  wc     [label="wc -l"]
+  log -> grep -> wc -> counts
 }
 ```
 
-### 4.2 Mapping B — nodes are data, edges are programs
+### 4.2 The Dataflow mapping — nodes are data, edges are programs
 
-The dataflow view. Nodes are *values* flowing through the system; an edge is the
-*transformation* that turns the value at its tail into the value at its head, and
-the transformation's command is the **edge `label`**.
+Nodes are *values* flowing through the system; an edge is the *transformation*
+that turns the value at its tail into the value at its head, and the
+transformation's command is the **edge `label`**.
 
 **Rules**
 
 - **Node = a named value/stream/file.** A node with no in-edges is an *input*; a
-  node with no out-edges is an *output*. A node whose id/label names a path (or
-  `shape=note`) is a real file; otherwise it is an anonymous buffer realized as a
-  pipe or temp file.
+  node with no out-edges is an *output*. A node with `shape=note` (or whose
+  id/label is a path) is a real file; otherwise it is an anonymous buffer
+  realized as a pipe or temp file.
 - **Edge = a program.** `x -> y [label="grep 404"]` means `y` is `x` filtered by
   `grep 404`. A linear chain `i -> a -> b -> o` with edge labels is the pipeline
   `<i  prog_a | prog_b  >o`.
@@ -217,31 +229,32 @@ the transformation's command is the **edge `label`**.
   materializing the node).
 - **Multi-input programs are awkward**: a dot edge has exactly one tail, so a
   program that consumes two values needs a *junction node* (`gl_role=op`, label =
-  the program) with several in-edges. This is Mapping B leaking toward C, and is
-  the main reason B is not always the most concise (see §12.5).
+  the program) with several in-edges. This is the Dataflow mapping leaking toward
+  Typed, and is the main reason it is not always the most concise (see §12.5).
 - **Variables are beautiful** here: a node *is* a named value, so
   `today [label="$(date +%F)"]` defines a variable other edges can reference
   (§7).
 
-B shines when intermediate data is *named and reused*; it is verbose for a plain
-`a | b | c` (you must name the otherwise-anonymous streams) and clumsy for
+Dataflow shines when intermediate data is *named and reused*; it is verbose for a
+plain `a | b | c` (you must name the otherwise-anonymous streams) and clumsy for
 control flow.
 
 ```dot
 digraph {                       // grep 404 < access.log | wc -l > counts.txt
   access_log -> hits   [label="grep 404"]
   hits       -> counts [label="wc -l"]
-  access_log [shape=note]
-  counts     [shape=note]
+  access_log [shape=note,label="access.log"]
+  counts     [shape=note,label="counts.txt"]
 }
 ```
 
-### 4.3 Mapping C — hybrid / typed nodes (the general model)
+### 4.3 The Typed mapping — typed nodes (the general model)
 
-Mappings A and B are special cases of one model: **every node has a role, and an
-edge's meaning is determined by the roles of its endpoints.** C is the model the
-transpiler actually works in; A and B are restrictions that fix most roles by
-convention so you don't have to spell them out.
+The Commands and Dataflow mappings are special cases of one model: **every node
+has a role, and an edge's meaning is determined by the roles of its endpoints.**
+Typed is the model the transpiler actually works in; the other two are
+restrictions that fix most roles by convention so you don't have to spell them
+out.
 
 **Node roles** (from `shape`, or explicitly `gl_role=…`):
 
@@ -265,25 +278,25 @@ convention so you don't have to spell them out.
 | value → program         | variable use         | `$value` substituted (§7)    |
 | program → value         | capture              | `value=$(tail)` (§7)         |
 
-Because roles are explicit, C handles everything A and B handle *and* the cases
-each finds awkward (multi-input ops, files mixed with pipes, fd routing,
-variables). The cost is that you sometimes annotate roles. The recommendation:
-**author in A or B for clarity; reach into C only where you need a role A/B don't
-give you for free.** A single file may freely mix conventions — the underlying
-model is the same.
+Because roles are explicit, Typed handles everything Commands and Dataflow handle
+*and* the cases each finds awkward (multi-input ops, files mixed with pipes, fd
+routing, variables). The cost is that you sometimes annotate roles. The
+recommendation: **author in Commands or Dataflow for clarity; reach into Typed
+only where you need a role the others don't give you for free.** A single file
+may freely mix conventions — the underlying model is the same.
 
 ### 4.4 Declaring the mapping
 
 A file declares its convention with a graph attribute:
 
 ```dot
-digraph { gl_mapping="A"   /* "A" | "B" | "C"; default "C" */ … }
+digraph { gl_mapping="commands"   /* "commands" | "dataflow" | "typed"; default "typed" */ … }
 ```
 
-- `gl_mapping="A"` — unlabeled edges are pipes; node text is the command.
-- `gl_mapping="B"` — node text is data; edge `label` is the command.
-- `gl_mapping="C"` (default) — roles drive everything; unspecified roles default
-  to `program` for box-ish shapes and `file` for `note`.
+- `gl_mapping="commands"` — unlabeled edges are pipes; node text is the command.
+- `gl_mapping="dataflow"` — node text is data; edge `label` is the command.
+- `gl_mapping="typed"` (default) — roles drive everything; unspecified roles
+  default to `program` for box-ish shapes and `file` for `note`.
 
 The mapping only changes *defaults*; explicit `gl_role`/ports always win, so the
 three are interoperable within one file.
@@ -317,7 +330,7 @@ build [label="make"]
 build:err -> build:out        // make 2>&1   (stderr follows stdout)
 ```
 
-**Routing examples (Mapping A/C):**
+**Routing examples (Commands/Typed):**
 
 ```dot
 make [label="make"]
@@ -326,12 +339,12 @@ make:err -> errlog            //  make 2> build.err
 
 deploy[label="deploy"]
 make:out -> deploy:in         //  make | deploy   (explicit; same as make->deploy)
-make:err -> deploy:in         //  ⇒ stderr also joins deploy's stdin (see §9 merge)
 ```
 
-> In Mapping B, where edges are programs, fd routing on a *program edge* is
-> expressed with edge attributes instead (`gl_stderr="file"`, `gl_fd="2>&1"`),
-> because B has no node to hang a port on. This asymmetry is one of B's costs.
+> In the Dataflow mapping, where edges are programs, fd routing on a *program
+> edge* is expressed with edge attributes instead (`gl_stderr="file"`,
+> `gl_fd="2>&1"`), because Dataflow has no node to hang a port on. This asymmetry
+> is one of Dataflow's costs.
 
 ---
 
@@ -362,9 +375,18 @@ digraph {                                   // make && make install || echo FAIL
 ```
 
 Control edges define an ordering DAG; the transpiler emits statements in a
-topological order consistent with both control edges and data edges. Independent
-nodes (no path between them) may be emitted as a sequence by default, or run
-concurrently with `gl_async=true` (→ `&`, with a `wait`).
+topological order consistent with both control edges and data edges.
+
+**Concurrency (resolved, §13):** independent nodes — those with no path between
+them — are emitted **sequentially in source order by default**. To run a node
+concurrently, set `gl_async=true`; the transpiler emits it with a trailing `&`
+and adds a `wait` at the join. This keeps the common case reproducible while
+leaving an explicit opt-in for parallel fan-out.
+
+**Ordering ambiguity (resolved, §13):** when several topological orders are
+valid, the transpiler picks a **deterministic order = source order**. Running
+with `--strict` instead makes ambiguity an error, forcing the author to add
+enough control edges to disambiguate.
 
 ### 6.2 Grouping — subshells, brace groups, functions
 
@@ -399,26 +421,28 @@ A **value node** (`gl_role=value`, drawn `shape=oval`) is a shell variable.
 - **Definition.** The node's `label` is `NAME=expr`, or just a value with the id
   as the name. `today [gl_role=value,label="today=$(date +%F)"]` → `today=$(date
   +%F)`.
-- **Capture from a command (Mapping A/C).** An edge from a program node to a
+- **Capture from a command (Commands/Typed).** An edge from a program node to a
   value node captures stdout: `cmd -> ver [gl_role=value]` with `gl_name=VER` →
   `VER=$(cmd)`.
-- **Capture in Mapping B** is free: every node is already a value, so
+- **Capture in Dataflow** is free: every node is already a value, so
   `ver [label="$(git describe)"]` *is* the assignment, and downstream edges
   reference it.
 - **Use.** Any `$NAME` / `${NAME}` written inside a `label` is passed through to
-  bash unchanged. A `value -> program` edge means "make this variable available
-  to this command"; the transpiler ensures the assignment precedes the use in
-  the emitted ordering.
+  bash **literally** (the quoting boundary is resolved in §13: gripeline never
+  re-quotes label text; `gl_raw` is the escape hatch). A `value -> program` edge
+  means "make this variable available to this command"; the transpiler ensures
+  the assignment precedes the use in the emitted ordering.
 
 ```dot
 digraph {                                 //  ver=$(git describe --tags)
   ver  [gl_role=value, shape=oval]        //  echo "building $ver" | tee build.log
   git  [label="git describe --tags"]
   echo [label="echo \"building $ver\""]
+  tee  [label="tee"]
   log  [shape=note,label="build.log"]
   git  -> ver [gl_name="ver"]             //  ver=$(git describe --tags)
   ver  -> echo                            //  (ordering: ver defined before echo)
-  echo -> tee[label="tee"] -> log
+  echo -> tee -> log
 }
 ```
 
@@ -456,7 +480,8 @@ A `while read` loop fed by a data edge wires that edge to the loop's stdin:
 ```dot
 digraph {                                 //  sort hosts | while read h; do
   hosts [shape=note,label="hosts"]        //      ping -c1 "$h"
-  hosts -> sort[label="sort"]             //  done
+  sort  [label="sort"]                    //  done
+  hosts -> sort
   subgraph cluster_ping {
     gl_loop="while read h"
     p [label="ping -c1 \"$h\""]
@@ -465,13 +490,18 @@ digraph {                                 //  sort hosts | while read h; do
 }
 ```
 
-### 8.2 Feedback loops — cycles (advanced)
+### 8.2 Feedback loops — cycles (resolved)
 
-A *cycle in the data edges* expresses feedback. In v1 a back-edge transpiles to a
-`coproc` (a bidirectional fifo pair) or, with `gl_loop="while …"` on the cycle,
-to a stream loop. Because cycles are easy to draw and hard to give crisp stream
-semantics, **an undeclared data cycle is reported as not-executable (§9)** and
-must be made explicit with `gl_role=coproc` or a loop annotation. (See §13.)
+A *cycle in the data edges* expresses feedback. **Resolved (§13): an undeclared
+data cycle is not executable** (§9, E04). To make a cycle executable you must
+declare its semantics explicitly, either:
+
+- `gl_role="coproc"` on the node that closes the loop → a `coproc` (bidirectional
+  fifo pair); or
+- `gl_loop="while …"` on a cluster that contains the cycle → a streaming loop.
+
+This avoids guessing stream semantics from a picture that merely happens to have
+a back-edge.
 
 ---
 
@@ -485,16 +515,16 @@ picture explains itself*.
 
 **Executability conditions** (failing any one makes the graph not executable):
 
-| # | condition                                                       | reported reason |
-|---|-----------------------------------------------------------------|-----------------|
-| 1 | graph is `digraph` (not undirected `graph`)                     | "data flow needs direction; use `digraph`" |
-| 2 | every program node has operation text (non-empty label or id-as-command) | "node `x` has no operation" |
-| 3 | no two data edges target the same fd of one node without a defined merge | "fd 0 of `x` has 2 inputs; use fan-in (`gl_role=op`/`cat`)" |
-| 4 | data edges are acyclic *unless* the cycle is a declared `coproc`/loop | "data cycle `x→y→x` without loop/coproc semantics" |
-| 5 | control edges are acyclic                                       | "ordering cycle among `a,b`" |
-| 6 | every edge has a defined transpilation for its endpoint roles  | "edge `file→file` has no program between them" |
-| 7 | a port refers to a fd only on a node that has one (no fds on a file/value) | "`f:err` — file nodes have no fd 2" |
-| 8 | at most one capture target per value, no conflicting captures  | "value `v` captured by 2 commands" |
+| code | condition                                                       | reported reason |
+|------|-----------------------------------------------------------------|-----------------|
+| E01  | graph is `digraph` (not undirected `graph`)                     | "data flow needs direction; use `digraph`" |
+| E02  | every program node has operation text (non-empty label or id)  | "node `x` has no operation" |
+| E03  | no two data edges target the same fd of one node without a defined merge | "fd 0 of `x` has 2 inputs; use fan-in (`gl_role=op`/`cat`)" |
+| E04  | data edges are acyclic *unless* the cycle is a declared `coproc`/loop | "data cycle `x→y→x` without loop/coproc semantics" |
+| E05  | control edges are acyclic                                       | "ordering cycle among `a,b`" |
+| E06  | every edge has a defined transpilation for its endpoint roles  | "edge `file→file` has no program between them" |
+| E07  | a port refers to a fd only on a node that has one (no fds on file/value) | "`f:err` — file nodes have no fd 2" |
+| E08  | at most one capture target per value, no conflicting captures  | "value `v` captured by 2 commands" |
 
 **Output contract for a non-executable graph:**
 
@@ -524,7 +554,7 @@ Graphviz's own attributes, and so Graphviz simply ignores them when drawing.
 
 | attribute       | values                       | meaning                          |
 |-----------------|------------------------------|----------------------------------|
-| `gl_mapping`    | `A` `B` `C`                  | default convention (§4.4)        |
+| `gl_mapping`    | `commands` `dataflow` `typed`| default convention (§4.4)        |
 | `gl_prologue`   | shell text                   | replaces default `set -euo pipefail` |
 | `gl_shell`      | `bash` (only, for now)       | target shell                     |
 
@@ -544,13 +574,13 @@ Graphviz's own attributes, and so Graphviz simply ignores them when drawing.
 | attribute    | values                  | meaning                                   |
 |--------------|-------------------------|-------------------------------------------|
 | `gl_edge`    | `pipe`(default) `seq` `and` `or` `redirect` | edge kind (§3, §6)        |
-| `gl_stderr`  | path / `2>&1`           | (Mapping B) fd routing for a program edge |
-| `gl_fd`      | raw redirection         | (Mapping B) arbitrary fd op on the edge   |
+| `gl_stderr`  | path / `2>&1`           | (Dataflow) fd routing for a program edge  |
+| `gl_fd`      | raw redirection         | (Dataflow) arbitrary fd op on the edge    |
 
-**Operation text** comes from `label` (node, or edge in Mapping B), falling back
-to the node id. Anything inside `label` is treated as a bash command/word list
-and emitted as written (you quote inside the label exactly as you would in
-bash).
+**Operation text** comes from `label` (node, or edge in the Dataflow mapping),
+falling back to the node id. Anything inside `label` is treated as a bash
+command/word list and emitted as written (you quote inside the label exactly as
+you would in bash).
 
 ---
 
@@ -574,13 +604,17 @@ A conforming **diagram** is any `dot` file; conformance is a property of the
 *tool*, not the source. Every diagram is renderable; the tool decides
 executability per §9.
 
+The test harness in [`tests/`](tests/) encodes this contract as fixtures (see
+[tests/README.md](tests/README.md)).
+
 ---
 
 ## 12. Example gallery
 
 Each example gives the **bash** first (the gloss), then the **same program in all
 three mappings**. Recall the recommended workflow is to *author* in whichever
-mapping reads best; these side-by-sides exist to show the correspondence.
+mapping reads best; these side-by-sides exist to show the correspondence. Every
+example here also exists as a fixture under `tests/cases/`.
 
 ### 12.1 A plain three-stage pipe
 
@@ -588,22 +622,22 @@ mapping reads best; these side-by-sides exist to show the correspondence.
 cat access.log | grep 404 | wc -l
 ```
 ```dot
-/* A */ digraph { gl_mapping="A"
+/* Commands */ digraph { gl_mapping="commands"
   a[label="cat access.log"] b[label="grep 404"] c[label="wc -l"]
   a -> b -> c }
 ```
 ```dot
-/* B */ digraph { gl_mapping="B"
+/* Dataflow */ digraph { gl_mapping="dataflow"
   access_log -> hits [label="grep 404"]
   hits -> n          [label="wc -l"]
-  access_log [label="access.log"] }
+  access_log [shape=note,label="access.log"] }
 ```
 ```dot
-/* C */ digraph {
+/* Typed */ digraph {
   log[shape=note,label="access.log"] g[label="grep 404"] w[label="wc -l"]
   log -> g -> w }
 ```
-*A is shortest here; B pays for naming the streams.*
+*Commands is shortest here; Dataflow pays for naming the streams.*
 
 ### 12.2 Redirection in and out
 
@@ -611,21 +645,23 @@ cat access.log | grep 404 | wc -l
 grep 404 < access.log | wc -l > counts.txt
 ```
 ```dot
-/* A */ digraph { gl_mapping="A"
+/* Commands */ digraph { gl_mapping="commands"
   in [shape=note,label="access.log"]
   out[shape=note,label="counts.txt"]
-  in -> g[label="grep 404"] -> w[label="wc -l"] -> out }
+  g[label="grep 404"] w[label="wc -l"]
+  in -> g -> w -> out }
 ```
 ```dot
-/* B */ digraph { gl_mapping="B"
+/* Dataflow */ digraph { gl_mapping="dataflow"
   access_log -> hits [label="grep 404"]
   hits -> counts     [label="wc -l"]
-  access_log[shape=note] counts[shape=note] }
+  access_log[shape=note,label="access.log"] counts[shape=note,label="counts.txt"] }
 ```
 ```dot
-/* C */ digraph {
+/* Typed */ digraph {
   in[shape=note,label="access.log"] out[shape=note,label="counts.txt"]
-  in -> g[label="grep 404"] -> w[label="wc -l"] -> out }
+  g[label="grep 404"] w[label="wc -l"]
+  in -> g -> w -> out }
 ```
 
 ### 12.3 stderr routing (`2>` and `2>&1`)
@@ -635,23 +671,24 @@ make 2> build.err            # case 1
 make 2>&1 | grep -i error    # case 2
 ```
 ```dot
-/* A/C, case 1 */ digraph {
+/* Commands/Typed, case 1 */ digraph {
   errlog[shape=note,label="build.err"]
   make[label="make"]
   make:err -> errlog }
 ```
 ```dot
-/* A/C, case 2 */ digraph {
+/* Commands/Typed, case 2 */ digraph {
   make[label="make"] g[label="grep -i error"]
   make:err -> make:out        // 2>&1
   make:out -> g }             // | grep -i error
 ```
 ```dot
-/* B, case 2 (fd via edge attrs) */ digraph { gl_mapping="B"
+/* Dataflow, case 2 (fd via edge attrs) */ digraph { gl_mapping="dataflow"
   build -> errs [label="grep -i error", gl_stderr="2>&1"]
   build[label="make"] }
 ```
-*Ports make fd routing crisp in A/C; B expresses it with edge attributes.*
+*Ports make fd routing crisp in Commands/Typed; Dataflow expresses it with edge
+attributes.*
 
 ### 12.4 Fan-out (`tee` / process substitution)
 
@@ -659,24 +696,27 @@ make 2>&1 | grep -i error    # case 2
 sort data.txt | tee >(head -1 > first.txt) >(tail -1 > last.txt) > sorted.txt
 ```
 ```dot
-/* A/C */ digraph {
+/* Commands/Typed */ digraph {
   data[shape=note,label="data.txt"]
   sorted[shape=note,label="sorted.txt"]
   first[shape=note,label="first.txt"] last[shape=note,label="last.txt"]
-  data -> s[label="sort"]
-  s -> sorted                       // main output
-  s -> h[label="head -1"] -> first  // branch 1  (via tee >(…))
-  s -> t[label="tail -1"] -> last   // branch 2
+  s[label="sort"] h[label="head -1"] t[label="tail -1"]
+  data -> s
+  s -> sorted          // main output
+  s -> h  h -> first   // branch 1  (via tee >(…))
+  s -> t  t -> last    // branch 2
 }
 ```
 ```dot
-/* B */ digraph { gl_mapping="B"
+/* Dataflow */ digraph { gl_mapping="dataflow"
   data -> sorted [label="sort"]
   sorted -> first [label="head -1"]
   sorted -> last  [label="tail -1"]
-  data[shape=note] sorted[shape=note] first[shape=note] last[shape=note] }
+  data[shape=note,label="data.txt"] sorted[shape=note,label="sorted.txt"]
+  first[shape=note,label="first.txt"] last[shape=note,label="last.txt"] }
 ```
-*Fan-out is where B reads best: one value, several consumers, no `tee` noise.*
+*Fan-out is where Dataflow reads best: one value, several consumers, no `tee`
+noise.*
 
 ### 12.5 Fan-in (multiple inputs to one program)
 
@@ -684,24 +724,26 @@ sort data.txt | tee >(head -1 > first.txt) >(tail -1 > last.txt) > sorted.txt
 cat <(curl -s host1/metrics) <(curl -s host2/metrics) | sort | uniq -c
 ```
 ```dot
-/* A/C */ digraph {
+/* Commands/Typed */ digraph {
   c1[label="curl -s host1/metrics"]
   c2[label="curl -s host2/metrics"]
   merge[label="cat", gl_role=op]    // op node: many inputs → cat <(..) <(..)
+  s[label="sort"] u[label="uniq -c"]
   c1 -> merge
   c2 -> merge
-  merge -> s[label="sort"] -> u[label="uniq -c"]
+  merge -> s -> u
 }
 ```
 ```dot
-/* B (needs an op node too — B's awkward case) */ digraph { gl_mapping="B"
+/* Dataflow (needs an op node too — Dataflow's awkward case) */
+digraph { gl_mapping="dataflow"
   m1 -> merged [label="curl -s host1/metrics"]
   m2 -> merged [label="curl -s host2/metrics"]   // two edges into one value node
   merged -> counted [label="sort | uniq -c"]
 }
 ```
-*Multi-input forces an `op`/merge node; this is the seam where A and B both bend
-toward C.*
+*Multi-input forces an `op`/merge node; this is the seam where both Commands and
+Dataflow bend toward Typed.*
 
 ### 12.6 Sequencing and conditionals (`&&`, `||`)
 
@@ -709,13 +751,13 @@ toward C.*
 make && make install || echo FAIL
 ```
 ```dot
-/* A/C */ digraph {
+/* Commands/Typed */ digraph {
   make[label="make"] inst[label="make install"] fail[label="echo FAIL"]
   make -> inst [gl_edge=and, style=dashed, color=darkgreen]
   inst -> fail [gl_edge=or,  style=dashed, color=orange]
 }
 ```
-*B is ill-suited to control flow; author conditionals in A/C.*
+*Dataflow is ill-suited to control flow; author conditionals in Commands/Typed.*
 
 ### 12.7 Subshell / function (grouping)
 
@@ -724,7 +766,7 @@ backup() { tar czf - "$DIR" | gpg -e; }
 backup > out.tgz.gpg
 ```
 ```dot
-/* A/C */ digraph {
+/* Commands/Typed */ digraph {
   subgraph cluster_backup {
     gl_role="function"; gl_name="backup"
     t[label="tar czf - \"$DIR\""] g[label="gpg -e"]
@@ -742,17 +784,17 @@ ver=$(git describe --tags)
 echo "building $ver" | tee build.log
 ```
 ```dot
-/* A/C */ digraph {
+/* Commands/Typed */ digraph {
   git[label="git describe --tags"]
   ver[gl_role=value, shape=oval]
-  echo[label="echo \"building $ver\""] log[shape=note,label="build.log"]
+  echo[label="echo \"building $ver\""] tee[label="tee"] log[shape=note,label="build.log"]
   git -> ver [gl_name="ver"]          // ver=$(git describe --tags)
   ver -> echo                         // ordering: define before use
-  echo -> tee[label="tee"] -> log
+  echo -> tee -> log
 }
 ```
 ```dot
-/* B (variable = node, very natural) */ digraph { gl_mapping="B"
+/* Dataflow (variable = node, very natural) */ digraph { gl_mapping="dataflow"
   ver[label="$(git describe --tags)"]
   ver -> announced [label="echo \"building $ver\""]
   announced -> log [label="tee"]
@@ -765,7 +807,7 @@ echo "building $ver" | tee build.log
 for f in *.txt; do gzip -k "$f"; done
 ```
 ```dot
-/* A/C */ digraph {
+/* Commands/Typed */ digraph {
   subgraph cluster_each {
     gl_loop="for f in *.txt"
     z[label="gzip -k \"$f\""]
@@ -779,9 +821,10 @@ for f in *.txt; do gzip -k "$f"; done
 sort hosts | while read h; do ping -c1 "$h"; done
 ```
 ```dot
-/* A/C */ digraph {
+/* Commands/Typed */ digraph {
   hosts[shape=note,label="hosts"]
-  hosts -> sort[label="sort"]
+  sort[label="sort"]
+  hosts -> sort
   subgraph cluster_ping {
     gl_loop="while read h"
     p[label="ping -c1 \"$h\""]
@@ -803,7 +846,7 @@ for svc in api web worker; do
 done | tee build.log
 ```
 ```dot
-/* C (mix value + loop + control edges + redirect) */
+/* Typed (mix value + loop + control edges + redirect) */
 digraph deploy {
   gl_prologue="set -euo pipefail"
 
@@ -824,8 +867,10 @@ digraph deploy {
     fail  -> flog                                  // >> failures.log
   }
 
+  tee  [label="tee"]
   blog [shape=note, label="build.log"]
-  cluster_each -> tee[label="tee"] -> blog          // loop stdout | tee build.log
+  cluster_each -> tee                               // loop stdout | tee build.log
+  tee -> blog
 
   ver -> cluster_each                               // ordering: ver before loop
 }
@@ -835,28 +880,25 @@ This single file renders as a deploy diagram *and* runs as the script above.
 
 ---
 
-## 13. Open questions
+## 13. Resolved decisions and open questions
 
-These are deliberately unresolved in Draft 0.1 and good candidates for the next
-conversation:
+**Resolved in Draft 0.2** (folded into the sections noted):
 
-1. **Data cycles.** §8.2 punts on undeclared cycles. Options: (a) always require
-   `gl_role=coproc`/`gl_loop`; (b) infer a `while` when exactly one back-edge
-   exists; (c) forbid cycles entirely in v1. Current draft: (a).
-2. **Concurrency model.** Independent subgraphs: emit sequentially (simple,
-   reproducible) or run concurrently by default (matches the "parallel arrows"
-   intuition)? Current draft: sequential unless `gl_async`.
-3. **Ordering ambiguity.** When several topological orders are valid and side
-   effects differ, do we (a) pick a deterministic order (e.g., source order),
-   (b) warn, or (c) require enough control edges to disambiguate? Current draft:
-   (a) deterministic by source order, with an optional `--strict` for (c).
-4. **Quoting boundary.** Labels are emitted verbatim as bash. Should gripeline
-   ever quote/escape for the user, or always treat the label as the author's
-   literal shell text? Current draft: literal (escape hatch is `gl_raw`).
-5. **Argument-bearing nodes vs. ports for fds.** Should fds beyond 0/1/2 be
-   first-class (named ports), or is that rare enough to leave to `gl_raw`?
-6. **Round-trip.** A `bash → dot` direction was deprioritized for authoring, but
-   a `gripeline graph script.sh` that emits a diagram would help adoption. Worth
-   a sibling spec?
-7. **Multiple mappings in one file.** Allowed today via per-element roles. Should
-   `gl_mapping` be settable per-subgraph for locality?
+1. **Data cycles** (§8.2, §9 E04) — an undeclared data cycle is *not executable*;
+   the author must declare `gl_role="coproc"` or a `gl_loop`. No inference.
+2. **Concurrency** (§6.1) — independent nodes run *sequentially in source order*;
+   `gl_async=true` opts a node into background execution (`&` + `wait`).
+3. **Ordering ambiguity** (§6.1) — resolved *deterministically by source order*;
+   `--strict` turns ambiguity into an error instead.
+4. **Quoting boundary** (§7, §10) — label text is emitted *literally*; gripeline
+   never re-quotes. The `gl_raw` attribute is the escape hatch for anything the
+   readable forms can't express.
+
+**Still open:**
+
+5. **Arbitrary file descriptors.** fds 0/1/2 are first-class via ports. Should
+   fds beyond those be modeled as named ports too, or left to `gl_raw`?
+   *Undecided.*
+6. **Multiple mappings in one file.** Per-element roles already allow mixing.
+   Should `gl_mapping` additionally be settable *per-subgraph* for locality?
+   *Undecided.*

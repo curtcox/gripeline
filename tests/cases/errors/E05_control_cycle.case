@@ -1,0 +1,12 @@
+name: E05-control-cycle
+spec: 9
+expect: error
+code: E05
+=== dot ===
+digraph {
+  a[label="step-a"] b[label="step-b"]
+  a -> b [gl_edge=seq]
+  b -> a [gl_edge=seq]
+}
+=== error ===
+ordering cycle

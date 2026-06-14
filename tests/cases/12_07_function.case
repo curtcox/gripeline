@@ -1,0 +1,18 @@
+name: 12.7-function
+mapping: typed
+spec: 12.7
+expect: contains
+=== dot ===
+digraph {
+  subgraph cluster_backup {
+    gl_role="function"; gl_name="backup"
+    t[label="tar czf - \"$DIR\""] g[label="gpg -e"]
+    t -> g
+  }
+  call[label="backup"] out[shape=note,label="out.tgz.gpg"]
+  call -> out
+}
+=== bash ===
+backup() {
+tar czf - "$DIR" | gpg -e
+backup > out.tgz.gpg

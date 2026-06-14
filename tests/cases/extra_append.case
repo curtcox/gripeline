@@ -1,0 +1,12 @@
+name: extra-append-redirect
+mapping: typed
+spec: 4.1
+expect: bash
+=== dot ===
+digraph {
+  c[label="echo hi"]
+  f[shape=note,label="log.txt",gl_append=true]
+  c -> f
+}
+=== bash ===
+echo hi >> log.txt

@@ -1,0 +1,11 @@
+name: extra-2to1-selfmerge
+mapping: typed
+spec: 5
+expect: bash
+=== dot ===
+digraph {
+  make[label="make"]
+  make:err -> make:out
+}
+=== bash ===
+make 2>&1

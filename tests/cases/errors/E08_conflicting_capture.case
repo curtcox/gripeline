@@ -1,0 +1,13 @@
+name: E08-conflicting-capture
+spec: 9
+expect: error
+code: E08
+=== dot ===
+digraph {
+  a[label="cmd-a"] b[label="cmd-b"]
+  v[gl_role=value, shape=oval]
+  a -> v [gl_name="v"]
+  b -> v [gl_name="v"]
+}
+=== error ===
+captured

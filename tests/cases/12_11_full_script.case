@@ -1,0 +1,36 @@
+name: 12.11-full-script
+mapping: typed
+spec: 12.11
+expect: contains
+=== dot ===
+digraph deploy {
+  gl_prologue="set -euo pipefail"
+  git [label="git describe --tags"]
+  ver [gl_role=value, shape=oval]
+  git -> ver [gl_name="ver"]
+  subgraph cluster_each {
+    gl_loop="for svc in api web worker"
+    build [label="docker build -t \"$svc:$ver\" \"./$svc\""]
+    push  [label="docker push \"$svc:$ver\""]
+    fail  [label="echo \"FAILED $svc\""]
+    flog  [shape=note, label="failures.log", gl_append=true]
+    build -> push [gl_edge=and, style=dashed]
+    push  -> fail [gl_edge=or,  style=dashed]
+    fail  -> flog
+  }
+  tee  [label="tee"]
+  blog [shape=note, label="build.log"]
+  cluster_each -> tee
+  tee -> blog
+  ver -> cluster_each
+}
+=== bash ===
+ver=$(git describe --tags)
+for svc in api web worker
+docker build -t "$svc:$ver" "./$svc"
+docker push "$svc:$ver"
+echo "FAILED $svc"
+failures.log
+tee
+build.log
+done

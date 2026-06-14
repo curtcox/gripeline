@@ -1,0 +1,10 @@
+name: 12.1-plain-pipe-commands
+mapping: commands
+spec: 12.1
+expect: bash
+=== dot ===
+digraph { gl_mapping="commands"
+  a[label="cat access.log"] b[label="grep 404"] c[label="wc -l"]
+  a -> b -> c }
+=== bash ===
+cat access.log | grep 404 | wc -l

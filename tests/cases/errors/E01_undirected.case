@@ -1,0 +1,8 @@
+name: E01-undirected-graph
+spec: 9
+expect: error
+code: E01
+=== dot ===
+graph { a -- b }
+=== error ===
+digraph

@@ -1,0 +1,21 @@
+name: 12.10-while-read
+mapping: typed
+spec: 12.10
+expect: contains
+=== dot ===
+digraph {
+  hosts[shape=note,label="hosts"]
+  sort[label="sort"]
+  hosts -> sort
+  subgraph cluster_ping {
+    gl_loop="while read h"
+    p[label="ping -c1 \"$h\""]
+  }
+  sort -> cluster_ping
+}
+=== bash ===
+sort
+hosts
+while read h
+ping -c1 "$h"
+done

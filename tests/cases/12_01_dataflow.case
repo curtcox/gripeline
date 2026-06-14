@@ -1,0 +1,11 @@
+name: 12.1-plain-pipe-dataflow
+mapping: dataflow
+spec: 12.1
+expect: bash
+=== dot ===
+digraph { gl_mapping="dataflow"
+  access_log -> hits [label="grep 404"]
+  hits -> n          [label="wc -l"]
+  access_log [shape=note,label="access.log"] }
+=== bash ===
+grep 404 < access.log | wc -l

@@ -1,0 +1,11 @@
+name: 12.3-stderr-to-file
+mapping: typed
+spec: 12.3
+expect: bash
+=== dot ===
+digraph {
+  errlog[shape=note,label="build.err"]
+  make[label="make"]
+  make:err -> errlog }
+=== bash ===
+make 2> build.err

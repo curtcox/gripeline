@@ -1,0 +1,12 @@
+name: E04-undeclared-data-cycle
+spec: 8.2
+expect: error
+code: E04
+=== dot ===
+digraph {
+  a[label="proc-a"] b[label="proc-b"]
+  a -> b
+  b -> a
+}
+=== error ===
+cycle

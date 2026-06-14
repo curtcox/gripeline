@@ -1,0 +1,15 @@
+name: extra-subshell-group
+mapping: typed
+spec: 6.2
+expect: contains
+=== dot ===
+digraph {
+  subgraph cluster_g {
+    gl_role="subshell"
+    a[label="cd /tmp"] b[label="ls"]
+    a -> b [gl_edge=seq]
+  }
+}
+=== bash ===
+cd /tmp
+ls

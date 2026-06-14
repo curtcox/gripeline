@@ -1,0 +1,12 @@
+name: E07-fd-on-file-node
+spec: 9
+expect: error
+code: E07
+=== dot ===
+digraph {
+  make[label="make"]
+  log[shape=note,label="out.log"]
+  make -> log:err
+}
+=== error ===
+file

@@ -1,0 +1,11 @@
+name: 12.2-redirect-dataflow
+mapping: dataflow
+spec: 12.2
+expect: bash
+=== dot ===
+digraph { gl_mapping="dataflow"
+  access_log -> hits [label="grep 404"]
+  hits -> counts     [label="wc -l"]
+  access_log[shape=note,label="access.log"] counts[shape=note,label="counts.txt"] }
+=== bash ===
+grep 404 < access.log | wc -l > counts.txt

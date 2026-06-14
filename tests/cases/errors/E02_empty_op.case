@@ -1,0 +1,12 @@
+name: E02-node-no-operation
+spec: 9
+expect: error
+code: E02
+=== dot ===
+digraph {
+  a[label="echo hi"]
+  b[label=""]
+  a -> b
+}
+=== error ===
+no operation

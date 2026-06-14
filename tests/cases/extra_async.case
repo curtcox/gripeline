@@ -1,0 +1,13 @@
+name: extra-gl-async
+mapping: commands
+spec: 6.1
+expect: contains
+=== dot ===
+digraph { gl_mapping="commands"
+  a[label="long-task", gl_async=true]
+  b[label="other-task"]
+}
+=== bash ===
+long-task &
+other-task
+wait

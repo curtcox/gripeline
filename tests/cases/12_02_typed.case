@@ -1,0 +1,11 @@
+name: 12.2-redirect-typed
+mapping: typed
+spec: 12.2
+expect: bash
+=== dot ===
+digraph {
+  in[shape=note,label="access.log"] out[shape=note,label="counts.txt"]
+  g[label="grep 404"] w[label="wc -l"]
+  in -> g -> w -> out }
+=== bash ===
+grep 404 < access.log | wc -l > counts.txt

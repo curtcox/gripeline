@@ -1,0 +1,10 @@
+name: 12.3-stderr-merge-dataflow
+mapping: dataflow
+spec: 12.3
+expect: bash
+=== dot ===
+digraph { gl_mapping="dataflow"
+  build -> errs [label="grep -i error", gl_stderr="2>&1"]
+  build[label="make"] }
+=== bash ===
+make 2>&1 | grep -i error

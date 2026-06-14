@@ -1,0 +1,21 @@
+name: 12.5-fanin-typed
+mapping: typed
+spec: 12.5
+expect: contains
+=== dot ===
+digraph {
+  c1[label="curl -s host1/metrics"]
+  c2[label="curl -s host2/metrics"]
+  merge[label="cat", gl_role=op]
+  s[label="sort"] u[label="uniq -c"]
+  c1 -> merge
+  c2 -> merge
+  merge -> s -> u
+}
+=== bash ===
+cat
+<(
+curl -s host1/metrics
+curl -s host2/metrics
+sort
+uniq -c

@@ -1,0 +1,11 @@
+name: 12.3-stderr-merge-typed
+mapping: typed
+spec: 12.3
+expect: bash
+=== dot ===
+digraph {
+  make[label="make"] g[label="grep -i error"]
+  make:err -> make:out
+  make:out -> g }
+=== bash ===
+make 2>&1 | grep -i error

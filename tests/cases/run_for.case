@@ -1,0 +1,20 @@
+name: run-for-behavioral
+mapping: typed
+spec: 12.9
+expect: contains
+runnable: true
+=== dot ===
+digraph {
+  subgraph cluster_e {
+    gl_loop="for i in 1 2 3"
+    e[label="echo $i"]
+  }
+}
+=== bash ===
+for i in 1 2 3
+echo $i
+done
+=== stdout ===
+1
+2
+3

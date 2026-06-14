@@ -1,0 +1,12 @@
+name: 12.2-redirect-commands
+mapping: commands
+spec: 12.2
+expect: bash
+=== dot ===
+digraph { gl_mapping="commands"
+  in [shape=note,label="access.log"]
+  out[shape=note,label="counts.txt"]
+  g[label="grep 404"] w[label="wc -l"]
+  in -> g -> w -> out }
+=== bash ===
+grep 404 < access.log | wc -l > counts.txt

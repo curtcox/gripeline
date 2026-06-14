@@ -1,0 +1,12 @@
+name: E03-fd-collision
+spec: 9
+expect: error
+code: E03
+=== dot ===
+digraph {
+  a[label="echo a"] b[label="echo b"] c[label="cat"]
+  a -> c
+  b -> c
+}
+=== error ===
+2 inputs

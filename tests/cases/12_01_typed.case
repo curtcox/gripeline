@@ -1,0 +1,10 @@
+name: 12.1-plain-pipe-typed
+mapping: typed
+spec: 12.1
+expect: bash
+=== dot ===
+digraph {
+  log[shape=note,label="access.log"] g[label="grep 404"] w[label="wc -l"]
+  log -> g -> w }
+=== bash ===
+grep 404 < access.log | wc -l

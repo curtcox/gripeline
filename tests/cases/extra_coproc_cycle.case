@@ -1,0 +1,13 @@
+name: extra-coproc-declared-cycle
+mapping: typed
+spec: 8.2
+expect: contains
+=== dot ===
+digraph {
+  gen[label="generator", gl_role=coproc]
+  proc[label="processor"]
+  gen -> proc
+  proc -> gen
+}
+=== bash ===
+coproc

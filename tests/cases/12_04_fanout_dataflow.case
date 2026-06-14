@@ -1,0 +1,18 @@
+name: 12.4-fanout-dataflow
+mapping: dataflow
+spec: 12.4
+expect: contains
+=== dot ===
+digraph { gl_mapping="dataflow"
+  data -> sorted [label="sort"]
+  sorted -> first [label="head -1"]
+  sorted -> last  [label="tail -1"]
+  data[shape=note,label="data.txt"] sorted[shape=note,label="sorted.txt"]
+  first[shape=note,label="first.txt"] last[shape=note,label="last.txt"] }
+=== bash ===
+sort
+tee
+head -1
+tail -1
+first.txt
+last.txt

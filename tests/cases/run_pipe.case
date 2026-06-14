@@ -1,0 +1,15 @@
+name: run-pipe-behavioral
+mapping: commands
+spec: 12.1
+expect: contains
+runnable: true
+=== dot ===
+digraph { gl_mapping="commands"
+  a[label="seq 1 5"] b[label="grep -v 3"] c[label="wc -l"]
+  a -> b -> c }
+=== bash ===
+seq 1 5
+grep -v 3
+wc -l
+=== stdout ===
+4

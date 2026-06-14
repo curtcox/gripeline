@@ -1,0 +1,12 @@
+name: E06-file-to-file
+spec: 9
+expect: error
+code: E06
+=== dot ===
+digraph {
+  x[shape=note,label="a.txt"]
+  y[shape=note,label="b.txt"]
+  x -> y
+}
+=== error ===
+no program

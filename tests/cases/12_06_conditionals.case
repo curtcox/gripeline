@@ -1,0 +1,12 @@
+name: 12.6-conditionals
+mapping: typed
+spec: 12.6
+expect: bash
+=== dot ===
+digraph {
+  make[label="make"] inst[label="make install"] fail[label="echo FAIL"]
+  make -> inst [gl_edge=and, style=dashed, color=darkgreen]
+  inst -> fail [gl_edge=or,  style=dashed, color=orange]
+}
+=== bash ===
+make && make install || echo FAIL
