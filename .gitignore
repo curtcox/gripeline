@@ -1,0 +1,6 @@
+# Generated site output (built by site/build.py and in CI)
+site/_site/
+
+# Python
+__pycache__/
+*.pyc
