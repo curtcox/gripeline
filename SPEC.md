@@ -1,6 +1,6 @@
 # gripeline — a specification for executing Graphviz `dot` files as shell pipelines
 
-**Status:** Draft 0.2 (design exploration)
+**Status:** Draft 0.3 (design exploration)
 **Source language:** unmodified Graphviz `dot`
 **Execution model:** transpile to `bash`
 **Scope:** pipes, files, file-descriptor routing, fan-out/fan-in, sequencing &
@@ -30,7 +30,7 @@ conditionals, subshells/functions, variables, command substitution, and loops.
 10. [Reserved attribute reference](#10-reserved-attribute-reference)
 11. [Conformance](#11-conformance)
 12. [Example gallery (bash ⇄ all three mappings)](#12-example-gallery)
-13. [Resolved decisions and open questions](#13-resolved-decisions-and-open-questions)
+13. [Resolved decisions](#13-resolved-decisions)
 
 ---
 
@@ -301,6 +301,36 @@ digraph { gl_mapping="commands"   /* "commands" | "dataflow" | "typed"; default 
 The mapping only changes *defaults*; explicit `gl_role`/ports always win, so the
 three are interoperable within one file.
 
+**`gl_mapping` is file-level only — it does not cascade per subgraph.** The
+mapping is the file's *reading frame*: it decides the most basic question about
+any node (is this box a program or a value? is the command on the node or the
+edge?). Letting it vary by cluster would mean the same picture means different
+things in different regions, and that a node silently changes meaning when
+cut-and-pasted across a cluster boundary — exactly the "same picture, two
+meanings" hazard §3 forbids for styling, but for something far more load-bearing
+than color. When a file genuinely needs to mix styles, that is what the **Typed**
+mapping is for (per-element roles).
+
+For *locality* without a second reading frame, use dot's own per-subgraph
+**default attributes** to give a region a flavor. `gl_role` and `gl_edge`
+defaults cascade exactly like any other dot attribute, so a cluster can lean
+toward, say, value nodes or sequencing edges without restating roles per element:
+
+```dot
+digraph {
+  subgraph cluster_pure {
+    node [gl_role=value]        // every undeclared node here is a variable
+    edge [gl_edge=seq]          // every undeclared edge here is `;` sequencing
+    a [label="x=1"]  b [label="y=2"]
+    a -> b
+  }
+}
+```
+
+This is native dot cascading (harmless to misread, and what users already
+expect), and it captures most of what a per-subgraph mapping would offer without
+changing what a node fundamentally *is*.
+
 ---
 
 ## 5. File descriptors and ports
@@ -322,12 +352,14 @@ hard to read.
 **Defaults:** a tail with no port means `out` (1); a head with no port means
 `in` (0). Therefore the bare `a -> b` is `a:out -> b:in` is `a | b`.
 
-**fd duplication / merge:** an edge from one port to another port *on the same
-node* is an fd dup. The classic `2>&1`:
+**Arbitrary fds — routing (any N).** Any port number is allowed, not just
+`0`/`1`/`2`. A numbered port wired to a file or another node is a plain
+*redirection*, which is order-independent and emitted directly:
 
 ```dot
-build [label="make"]
-build:err -> build:out        // make 2>&1   (stderr follows stdout)
+gen   [label="gen"]
+trace [shape=note,label="trace.out"]
+gen:3 -> trace                //  gen 3> trace.out   (fd 3 → file)
 ```
 
 **Routing examples (Commands/Typed):**
@@ -340,6 +372,28 @@ make:err -> errlog            //  make 2> build.err
 deploy[label="deploy"]
 make:out -> deploy:in         //  make | deploy   (explicit; same as make->deploy)
 ```
+
+**fd duplication is deliberately limited.** An edge from one port to another port
+*on the same node* is an fd *dup* (`M>&N`). The classic `2>&1` is supported:
+
+```dot
+build [label="make"]
+build:err -> build:out        // make 2>&1   (stderr follows stdout)
+```
+
+But a graph is an *unordered* set of edges, whereas fd dups are an *ordered*
+sequence of mutations to a shared descriptor table — `2>&1 1>file` differs from
+`1>file 2>&1`. gripeline therefore models fd *routing* (which fd goes where) but
+**not** fd *dup ordering*. A node carrying more than one dup, or a dup combined
+with a redirect of the same fd, is ambiguous and **not executable** (§9, E09);
+the diagnostic points you to `gl_raw` for order-sensitive surgery:
+
+```dot
+sw [gl_raw="cmd 3>&1 1>&2 2>&3 3>&-"]   // stdout/stderr swap: order matters
+```
+
+This keeps the readable win (numbered redirections — the legible case) without
+taking on bash's order-dependent dup semantics in a model that has no order.
 
 > In the Dataflow mapping, where edges are programs, fd routing on a *program
 > edge* is expressed with edge attributes instead (`gl_stderr="file"`,
@@ -525,6 +579,7 @@ picture explains itself*.
 | E06  | every edge has a defined transpilation for its endpoint roles  | "edge `file→file` has no program between them" |
 | E07  | a port refers to a fd only on a node that has one (no fds on file/value) | "`f:err` — file nodes have no fd 2" |
 | E08  | at most one capture target per value, no conflicting captures  | "value `v` captured by 2 commands" |
+| E09  | a node has at most one fd dup, and no dup competing with a redirect of the same fd | "fd dups on `x` are order-sensitive; use `gl_raw`" |
 
 **Output contract for a non-executable graph:**
 
@@ -880,9 +935,10 @@ This single file renders as a deploy diagram *and* runs as the script above.
 
 ---
 
-## 13. Resolved decisions and open questions
+## 13. Resolved decisions
 
-**Resolved in Draft 0.2** (folded into the sections noted):
+All design questions raised through Draft 0.2 are now resolved and folded into
+the sections noted:
 
 1. **Data cycles** (§8.2, §9 E04) — an undeclared data cycle is *not executable*;
    the author must declare `gl_role="coproc"` or a `gl_loop`. No inference.
@@ -893,12 +949,16 @@ This single file renders as a deploy diagram *and* runs as the script above.
 4. **Quoting boundary** (§7, §10) — label text is emitted *literally*; gripeline
    never re-quotes. The `gl_raw` attribute is the escape hatch for anything the
    readable forms can't express.
+5. **Arbitrary file descriptors** (§5, §9 E09) — any port number is first-class
+   for *routing* (`gen:3 -> file` → `3> file`); fd *duplication* is limited to
+   the order-independent `2>&1` shape, and order-sensitive dup surgery is an
+   ambiguity error (E09) directing the author to `gl_raw`. Rationale: a graph is
+   unordered, fd dups are an ordered sequence of table mutations, so gripeline
+   models fd routing but not dup ordering.
+6. **Per-subgraph mappings** (§4.4) — `gl_mapping` stays *file-level only*; it is
+   the file's single reading frame. Mixing styles is the job of the Typed mapping
+   (per-element roles), and per-region *locality* is achieved with dot's native
+   cascading `gl_role`/`gl_edge` subgraph defaults — not a second mapping.
 
-**Still open:**
-
-5. **Arbitrary file descriptors.** fds 0/1/2 are first-class via ports. Should
-   fds beyond those be modeled as named ports too, or left to `gl_raw`?
-   *Undecided.*
-6. **Multiple mappings in one file.** Per-element roles already allow mixing.
-   Should `gl_mapping` additionally be settable *per-subgraph* for locality?
-   *Undecided.*
+**Open questions:** none at this time. New questions will be added here as the
+transpiler implementation surfaces them.

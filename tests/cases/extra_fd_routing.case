@@ -1,0 +1,12 @@
+name: extra-fd3-routing
+mapping: typed
+spec: 5
+expect: bash
+=== dot ===
+digraph {
+  gen[label="gen"]
+  trace[shape=note,label="trace.out"]
+  gen:3 -> trace
+}
+=== bash ===
+gen 3> trace.out

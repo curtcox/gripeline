@@ -1,0 +1,12 @@
+name: E09-ambiguous-fd-dup
+spec: 5
+expect: error
+code: E09
+=== dot ===
+digraph {
+  cmd[label="cmd"]
+  cmd:out -> cmd:err
+  cmd:err -> cmd:out
+}
+=== error ===
+order-sensitive

@@ -1,0 +1,16 @@
+name: extra-subgraph-role-defaults
+mapping: typed
+spec: 4.4
+expect: contains
+=== dot ===
+digraph {
+  subgraph cluster_pure {
+    node [gl_role=value]
+    edge [gl_edge=seq]
+    a [label="x=1"]  b [label="y=2"]
+    a -> b
+  }
+}
+=== bash ===
+x=1
+y=2
