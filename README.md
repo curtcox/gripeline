@@ -115,7 +115,7 @@ uploads). CID syntax and content verification use t256's SHA-512 identifiers.
 The Apptron target verifies its pinned runtime manifest and gripeline overlay before
 enabling a handoff. The snapshot includes the exact compiler that checked the source;
 opening it performs a static check and offers a command to run explicitly.
-The canonical editor is prepared at [gripeline.hashbin.page](https://gripeline.hashbin.page/).
+The canonical editor is live at [gripeline.hashbin.page](https://gripeline.hashbin.page/).
 HashBin save controls use hosted per-save review and verify the returned CID.
 Saving stays disabled until its public client registration is complete; the shared
 Pages mirror always disables publishing. Oversized Apptron links can be downloaded
@@ -128,3 +128,8 @@ your installed tools or a check of every shell option. The local-run dialog
 lets you select a platform and disables copying for excluded environments.
 Portable t256 count, save and transform examples are executed in each CI OS
 with the verified release binary.
+
+
+The Pages editor keeps **Move saved work** and **Download backup** recovery
+controls. Moving a draft keeps the old copy and transfers only source and
+positions. Recovered drafts stay unverified until you review the visible bash.

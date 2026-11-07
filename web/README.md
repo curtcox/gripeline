@@ -43,3 +43,14 @@ Only the canonical origin may publish; its public client ID must be registered
 for `https://gripeline.hashbin.page/`. Missing registration keeps Save disabled.
 The shared recovery adapter accepts only source, finite positions and draft history.
 It retains the old copy and rejects credential or execution settings. See `../EDITOR_PLAN.md` for status.
+
+
+Optional live VM acceptance (requires network and downloads the real runtime):
+
+```sh
+node tests/live-apptron.mjs
+```
+
+This opens an inert snapshot at Apptron's canonical origin, presses Run explicitly,
+and verifies the exact embedded compiler and a non-inline CID store produce the
+expected output without enabling VM networking.

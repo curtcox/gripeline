@@ -1,3 +1,4 @@
+import './domain-migration.js';
 import {mountPublishing} from './publishing.js';
 import {checkApptronRuntime} from './apptron-runtime.js';
 import {classifyEnvironments,nativeEnvironments} from './environments.js';

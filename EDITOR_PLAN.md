@@ -11,8 +11,8 @@ Apptron’s verified runtime is live at `https://apptron.hashbin.page/`.
 | 0 | Pure API, stdin/CID inputs, Windows Bash discovery, installers and launchers | Linux, macOS and Windows CI pass, including native CID round trips and Windows installer execution |
 | 1 | Responsive editor, real Python worker, shared modl renderer, Graphviz, review dialog, share/QR, draft recovery, verified offline cache | Chromium and WebKit pass locally; Firefox passes all nine original tests in Linux CI. A long-gallery-name phone layout regression was reproduced and fixed |
 | 2 | t256 producers/sinks, canonical CID validation, guard, E14, twin fixtures and spec | Complete |
-| 3 | Verified linux/386 t256, released overlay, exact checked compiler and local CID store in inert txtar handoff | Nine real VM boot tests and four origin-isolation tests pass. All six portable gallery executions pass in the VM. Public runtime lock and manifest verify successfully; the editor enables handoff only after that verification |
-| 4 | Verified CID loading, typed modl envelopes, CID local commands, hosted Publish UI, large Apptron snapshot fallback, public-asset hosting and source-only migration | Register the actual public client ID; deploy canonical editor and mirror recovery notice; real paid-save acceptance requires the owner’s signed-in session |
+| 3 | Verified linux/386 t256, released overlay, exact checked compiler and local CID store in inert txtar handoff | Nine real VM boot tests and four origin-isolation tests pass. All six portable gallery executions pass in the VM. Public runtime lock and manifest verify successfully. Live public VM acceptance passes with the exact current compiler and an embedded non-inline CID store; opening the handoff remains inert |
+| 4 | Verified CID loading, typed modl envelopes, CID local commands, hosted Publish UI, large Apptron snapshot fallback, public-asset hosting and source-only migration | Canonical editor deployed and verified in Chromium/WebKit, including offline reload. Mirror recovery notice is implemented. Register the actual public client ID and perform real paid-save acceptance with the owner’s signed-in session |
 | 5 | requires/env, missing-tool guards, --portable advice, command inventories and environment badges | All three native CI platforms and the real Apptron VM pass the portable gallery, local saved-envelope execution and tamper rejection |
 
 Verification: `make check` (89 fixtures, 47 unit tests), site build, vendored
@@ -291,18 +291,21 @@ python3 gripeline.py check pipeline.modl && echo "Try: python3 gripeline.py run 
 Phases 0 and the modl renderer extraction can proceed in parallel. Phases 2 and
 3 depend on 0. Phase 4 depends on 1.
 
-## 9. Open questions
+## 9. Implementation decisions and remaining account work
 
-1. **`gripeline.hashbin.page`**: is that the right name, and is the HashBin
-   owned-app deploy tool available for a new app? The current upstream `hashbin.org` checkout provides it; the older local checkout did not.
-2. **Is the modl renderer extraction acceptable in modl**, or should gripeline
-   vendor `editor.js` and drive it through `globalThis.ModlApp`? The second
-   avoids a modl change but makes the editor modl's UI plus extras rather than
-   gripeline's own.
-3. **`t256:` sink output:** should it print the reference on stdout (so it can
-   feed later stages), or on stderr / to a named variable, so the pipeline's
-   stdout stays the data?
-4. **Windows support level:** is Git Bash only acceptable, or is
-   "run gripeline inside WSL" also a supported, CI-tested configuration?
-5. **Pyodide size:** is a roughly 10 MB first-transpile download acceptable on
-   phones, or should the editor show the bash pane only on demand?
+- The current HashBin owned-app tool deploys `gripeline.hashbin.page`; its
+  existence was hidden by the old local checkout. The canonical editor is live.
+- MODL's shared renderer was extracted, tested in MODL and gripeline, and deployed
+  to its existing canonical host. No renderer fork is maintained.
+- A `t256:` sink prints its reference on stdout, as specified by the twin fixtures.
+- Native Windows execution uses Git Bash. WSL is supported through the Linux
+  installation inside WSL; a Windows Python process rejects the WSL launcher.
+- Pyodide is pinned and self-hosted. Its initial runtime download is shown in the
+  editor's loading status; Graphviz loads only for dot input.
+- HashBin registration requires the owner's signed-in browser. No client ID was
+  invented: the registry intentionally records `null`, and saving stays disabled.
+  Register **gripeline** with the sole return URL `https://gripeline.hashbin.page/`,
+  record the real public ID in the editor meta tag and the HashBin owned-app
+  registry, redeploy, then approve a concrete save quote for paid acceptance.
+  The UI and CID-verification round trip already pass with the SDK test stand-in;
+  real paid saves are not claimed as complete.
