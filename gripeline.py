@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """gripeline — transpile a Graphviz `dot` or `modl` file into a bash script.
 
-See SPEC.md. The emitted bash is the normative meaning of a graph.
+See SPEC.md (Draft 0.4). The emitted bash is the normative meaning of a graph.
 
 Stages:  parse -> extract/resolve roles -> static check (§9) -> transpile (§§4-8).
 
@@ -16,10 +16,14 @@ CLI:
 """
 from __future__ import annotations
 
+import base64
+import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 from dataclasses import dataclass, field
 
 
@@ -144,6 +148,39 @@ class Cluster:
 
 RESERVED_SHAPE = {"box": "program", "note": "file", "cds": "stream"}
 
+MODL_SHAPES = {"circle", "square", "diamond", "triangle", "hex", "none"}
+MODL_SIZES = {"small", "medium", "big"}
+MODL_LINE_STYLES = {"solid", "dashed", "dotted", "bold"}
+MODL_COLORS = {
+    "red", "orange", "yellow", "green", "blue", "purple", "pink",
+    "brown", "gray", "grey", "black", "white", "cyan", "teal",
+    "magenta", "lime", "indigo", "violet",
+}
+MODL_ROLE_SHAPES = {
+    "square": "program",
+    "hex": "file",
+    "triangle": "stream",
+    "diamond": "value",
+}
+MODL_STYLE_KINDS = {
+    "solid": "data",
+    "bold": "data",
+    "dotted": "data",
+    "dashed": "control",
+}
+
+VALID_NODE_ROLES = {
+    "program", "file", "stream", "value", "op", "coproc",
+    "for", "while", "until", "if", "function", "subshell", "group",
+}
+VALID_CLUSTER_ROLES = {"subshell", "group", "function", "for", "while", "until"}
+VALID_EDGE_KINDS = {"pipe", "seq", "and", "or", "redirect"}
+VALID_MAPPINGS = {"commands", "dataflow", "typed"}
+VALID_SHELLS = {"bash"}
+
+_VALID_SHELL_ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_VALID_MODL_ID = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.:-]*$")
+
 
 @dataclass
 class Model:
@@ -157,7 +194,7 @@ class Model:
     line_styles: dict[str, str] = field(default_factory=dict)
     problems: list[tuple[str, str]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
-    raw_lines: list = field(default_factory=list)
+    raw_lines: dict = field(default_factory=dict)
 
 
 class GripError(Exception):
@@ -380,6 +417,692 @@ def parse_dot(src: str) -> Model:
 
 
 # ==========================================================================
+# Parser (modl front end)
+# ==========================================================================
+@dataclass
+class ModlWord:
+    raw: str
+    val: str
+    quoted: bool
+    start: int
+    end: int
+
+
+def _split_modl_comment(line: str) -> tuple[str, str | None, int]:
+    """Return (code_part, comment_body_or_None, comment_col).
+
+    In modl, a '#' at index 0 or preceded by whitespace outside double quotes
+    starts a comment to the end of the line.
+    """
+    in_quote = False
+    for i, c in enumerate(line):
+        if c == '"':
+            in_quote = not in_quote
+        elif c == "#" and not in_quote and (i == 0 or line[i - 1] in " \t"):
+            return line[:i], line[i + 1:], i
+    return line, None, len(line)
+
+
+def _split_modl_arrows(code: str) -> list[tuple[int, int]] | None:
+    """Split `code` on `->` outside double quotes.
+
+    Returns a list of (start, end) spans if at least one `->` is present,
+    or None if the line has no `->` outside quotes.
+    """
+    spans: list[tuple[int, int]] = []
+    in_quote = False
+    seg_start = 0
+    i = 0
+    n = len(code)
+    found = False
+    while i < n:
+        c = code[i]
+        if c == '"':
+            in_quote = not in_quote
+            i += 1
+        elif not in_quote and c == "-" and i + 1 < n and code[i + 1] == ">":
+            found = True
+            spans.append((seg_start, i))
+            seg_start = i + 2
+            i += 2
+        else:
+            i += 1
+    if not found:
+        return None
+    spans.append((seg_start, n))
+    return spans
+
+
+def _tokenize_modl_segment(seg: str) -> list[ModlWord]:
+    words: list[ModlWord] = []
+    i, n = 0, len(seg)
+    while i < n:
+        while i < n and seg[i] in " \t\r":
+            i += 1
+        if i >= n:
+            break
+        if seg[i] == '"':
+            start = i
+            j = i + 1
+            while j < n and seg[j] != '"':
+                j += 1
+            val = seg[i + 1 : j]
+            end = j + 1 if j < n else j
+            words.append(ModlWord(raw=seg[start:end], val=val, quoted=True,
+                                  start=start, end=end))
+            i = end
+        else:
+            start = i
+            j = i
+            while j < n and seg[j] not in ' \t\r"':
+                j += 1
+            val = seg[start:j]
+            words.append(ModlWord(raw=val, val=val, quoted=False,
+                                  start=start, end=j))
+            i = j
+    return words
+
+
+def _is_modl_url(w: ModlWord) -> bool:
+    if w.quoted:
+        return False
+    return w.val.startswith(("/", "http://", "https://", "www.", "mailto:"))
+
+
+def _parse_pragma_tokens(body: str, lineno: int) -> list[str]:
+    """Tokenize a #gl pragma body after stripping any trailing # comment.
+
+    Values inside `key="value"` may use dot-style `\\"` and `\\\\` escapes.
+    Raises ValueError with an E10 reason on unclosed quotes.
+    """
+    # Strip trailing `# ...` comment outside quotes (respecting backslash escapes)
+    in_quote = False
+    i = 0
+    n = len(body)
+    cut = n
+    while i < n:
+        c = body[i]
+        if in_quote and c == "\\" and i + 1 < n:
+            i += 2
+            continue
+        if c == '"':
+            in_quote = not in_quote
+        elif not in_quote and c == "#" and (i == 0 or body[i - 1] in " \t"):
+            cut = i
+            break
+        i += 1
+    if in_quote:
+        raise ValueError(f"line {lineno}: unclosed quote in #gl pragma")
+
+    s = body[:cut]
+    tokens: list[str] = []
+    i = 0
+    n = len(s)
+    while i < n:
+        while i < n and s[i] in " \t\r":
+            i += 1
+        if i >= n:
+            break
+        buf: list[str] = []
+        in_q = False
+        while i < n:
+            c = s[i]
+            if not in_q and c in " \t\r":
+                break
+            if not in_q and c == '"':
+                in_q = True
+                i += 1
+                continue
+            if in_q:
+                if c == "\\" and i + 1 < n:
+                    nxt = s[i + 1]
+                    if nxt in ('"', "\\"):
+                        buf.append(nxt)
+                    else:
+                        buf.append("\\")
+                        buf.append(nxt)
+                    i += 2
+                    continue
+                if c == '"':
+                    in_q = False
+                    i += 1
+                    continue
+                buf.append(c)
+                i += 1
+            else:
+                buf.append(c)
+                i += 1
+        if in_q:
+            raise ValueError(f"line {lineno}: unclosed quote in #gl pragma")
+        tokens.append("".join(buf))
+    return tokens
+
+
+def _parse_kv_pairs(tokens: list[str], lineno: int) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    for tok in tokens:
+        if "=" not in tok:
+            raise ValueError(f'line {lineno}: expected key=value in #gl pragma, got "{tok}"')
+        k, v = tok.split("=", 1)
+        if not k:
+            raise ValueError(f'line {lineno}: empty key in #gl pragma "{tok}"')
+        pairs.append((k, v))
+    return pairs
+
+
+class ModlParser:
+    def __init__(self, src: str):
+        self.src = src
+        self.nodes: dict[str, Node] = {}
+        self.edges: list[Edge] = []
+        self.clusters: dict[str, Cluster] = {}
+        self.graph_attrs: dict = {}
+        self.problems: list[tuple[str, str]] = []
+        self.warnings: list[str] = []
+        self.raw_lines: dict = {}
+        self.order = 0
+        self.scope_stack: list[ScopeCtx] = [
+            ScopeCtx(cluster=None, node_def={}, edge_def={}, attr_target=self.graph_attrs)
+        ]
+        self._explicit_role_nodes: set[str] = set()
+        self._standin_text: dict[str, str] = {}
+
+    def nextorder(self) -> int:
+        self.order += 1
+        return self.order
+
+    @property
+    def current_scope(self) -> ScopeCtx:
+        return self.scope_stack[-1]
+
+    def add_e10(self, msg: str):
+        self.problems.append(("E10", f"[E10] {msg}"))
+
+    def validate_id(self, w: ModlWord, lineno: int) -> str:
+        if w.quoted:
+            nid = re.sub(r"\s+", " ", w.val.strip())
+            if nid == "":
+                raise GripError(f"Line {lineno}: empty node id")
+            return nid
+        nid = w.val
+        if not _VALID_MODL_ID.match(nid):
+            raise GripError(f'Line {lineno}: invalid node id "{nid}"')
+        return nid
+
+    def ensure_node(self, nid: str, lineno: int) -> Node | None:
+        if nid in self.clusters:
+            return None
+        if nid not in self.nodes:
+            scope = self.current_scope
+            nd = Node(id=nid, attrs=dict(scope.node_def), cluster=scope.cluster,
+                      order=self.nextorder(), pos=lineno)
+            self.nodes[nid] = nd
+        return self.nodes[nid]
+
+    def apply_node_pragmas(self, nd: Node | None, nid: str, pairs: list[tuple[str, str]], lineno: int):
+        if nid in self.clusters:
+            for k, _v in pairs:
+                if k == "role":
+                    self.add_e10(f'line {lineno}: group id "{nid}" cannot also have a node role')
+                else:
+                    self.add_e10(f'line {lineno}: group id "{nid}" cannot take node pragma "{k}"')
+            return
+        if nd is None:
+            return
+        for k, v in pairs:
+            if k == "role":
+                if v not in VALID_NODE_ROLES:
+                    self.add_e10(f'line {lineno}: invalid role "{v}"')
+                else:
+                    nd.attrs["gl_role"] = v
+                    self._explicit_role_nodes.add(nid)
+            elif k == "name":
+                if not v:
+                    self.add_e10(f"line {lineno}: empty name in #gl pragma")
+                else:
+                    nd.attrs["gl_name"] = v
+            elif k in ("append", "async"):
+                if v not in ("true", "false"):
+                    self.add_e10(f'line {lineno}: invalid {k} value "{v}" (expected true or false)')
+                else:
+                    nd.attrs[f"gl_{k}"] = v
+            elif k == "raw":
+                nd.attrs["gl_raw"] = v
+            else:
+                self.add_e10(f'line {lineno}: unknown node pragma key "{k}"')
+
+    def parse_edge_pragmas(self, pairs: list[tuple[str, str]], lineno: int) -> tuple[dict, str | None, str | None]:
+        attrs: dict = {}
+        tail_port: str | None = None
+        head_port: str | None = None
+        for k, v in pairs:
+            if k == "edge":
+                if v not in VALID_EDGE_KINDS:
+                    self.add_e10(f'line {lineno}: invalid edge kind "{v}"')
+                else:
+                    attrs["gl_edge"] = v
+            elif k == "stderr":
+                if not v:
+                    self.add_e10(f"line {lineno}: empty stderr value in #gl pragma")
+                else:
+                    attrs["gl_stderr"] = v
+            elif k == "fd":
+                if not v:
+                    self.add_e10(f"line {lineno}: empty fd value in #gl pragma")
+                else:
+                    attrs["gl_fd"] = v
+            elif k == "name":
+                if not v:
+                    self.add_e10(f"line {lineno}: empty name in #gl pragma")
+                else:
+                    attrs["gl_name"] = v
+            elif k == "from":
+                if port_to_fd(v) is None:
+                    self.add_e10(f'line {lineno}: invalid port name "{v}" in from=')
+                else:
+                    tail_port = v
+            elif k == "to":
+                if port_to_fd(v) is None:
+                    self.add_e10(f'line {lineno}: invalid port name "{v}" in to=')
+                else:
+                    head_port = v
+            else:
+                self.add_e10(f'line {lineno}: unknown edge pragma key "{k}"')
+        return attrs, tail_port, head_port
+
+    def handle_whole_line_pragma(self, body: str, lineno: int):
+        try:
+            tokens = _parse_pragma_tokens(body, lineno)
+        except ValueError as e:
+            self.add_e10(str(e))
+            return
+
+        if not tokens:
+            self.add_e10(f"line {lineno}: empty #gl pragma")
+            return
+
+        head = tokens[0]
+        if head == "end":
+            if len(tokens) > 1:
+                self.add_e10(f"line {lineno}: unexpected arguments after #gl end")
+            if len(self.scope_stack) <= 1:
+                self.add_e10(f"line {lineno}: unbalanced #gl end (no open block)")
+            else:
+                cl_id = self.current_scope.cluster
+                self.scope_stack.pop()
+                if cl_id and cl_id in self.clusters:
+                    cl = self.clusters[cl_id]
+                    if cl.attrs.get("gl_role") in ("for", "while", "until") \
+                            and "gl_loop" not in cl.attrs and cl_id in self._standin_text:
+                        cl.attrs["gl_loop"] = self._standin_text[cl_id]
+            return
+
+        if head == "begin":
+            if len(tokens) < 2 or "=" in tokens[1]:
+                self.add_e10(f"line {lineno}: #gl begin requires a block id")
+                return
+            cid = tokens[1]
+            try:
+                pairs = _parse_kv_pairs(tokens[2:], lineno)
+            except ValueError as e:
+                self.add_e10(str(e))
+                return
+
+            if cid in self._explicit_role_nodes:
+                self.add_e10(f'line {lineno}: group id "{cid}" cannot also have a node role')
+            if cid in self.nodes:
+                nd = self.nodes.pop(cid)
+                if "label" in nd.attrs:
+                    self._standin_text[cid] = nd.attrs["label"]
+
+            parent_scope = self.current_scope
+            cl = Cluster(id=cid, parent=parent_scope.cluster,
+                         order=self.nextorder(), pos=lineno)
+            self.clusters[cid] = cl
+            node_def = dict(parent_scope.node_def)
+            edge_def = dict(parent_scope.edge_def)
+
+            for k, v in pairs:
+                if k == "role":
+                    if v not in VALID_CLUSTER_ROLES:
+                        self.add_e10(f'line {lineno}: invalid block role "{v}"')
+                    else:
+                        cl.attrs["gl_role"] = v
+                elif k == "name":
+                    if not v:
+                        self.add_e10(f"line {lineno}: empty name in #gl begin")
+                    else:
+                        cl.attrs["gl_name"] = v
+                elif k == "loop":
+                    if not v:
+                        self.add_e10(f"line {lineno}: empty loop header in #gl begin")
+                    else:
+                        cl.attrs["gl_loop"] = v
+                elif k == "default.role":
+                    if v not in VALID_NODE_ROLES:
+                        self.add_e10(f'line {lineno}: invalid default.role "{v}"')
+                    else:
+                        node_def["gl_role"] = v
+                elif k == "default.edge":
+                    if v not in VALID_EDGE_KINDS:
+                        self.add_e10(f'line {lineno}: invalid default.edge "{v}"')
+                    else:
+                        edge_def["gl_edge"] = v
+                else:
+                    self.add_e10(f'line {lineno}: unknown block pragma key "{k}"')
+
+            if cl.attrs.get("gl_role") in ("for", "while", "until") \
+                    and "gl_loop" not in cl.attrs and cid in self._standin_text:
+                cl.attrs["gl_loop"] = self._standin_text[cid]
+
+            self.scope_stack.append(
+                ScopeCtx(cluster=cid, node_def=node_def, edge_def=edge_def, attr_target=cl.attrs)
+            )
+            return
+
+        if head == "node":
+            if len(tokens) < 3 or "=" in tokens[1]:
+                self.add_e10(f"line {lineno}: #gl node requires an ID and key=value attributes")
+                return
+            nid = tokens[1]
+            try:
+                pairs = _parse_kv_pairs(tokens[2:], lineno)
+            except ValueError as e:
+                self.add_e10(str(e))
+                return
+            nd = self.ensure_node(nid, lineno)
+            self.apply_node_pragmas(nd, nid, pairs, lineno)
+            return
+
+        if head == "edge":
+            self.add_e10(f"line {lineno}: whole-line #gl edge is not supported; use a trailing pragma on the edge line")
+            return
+
+        # Graph-level pragma: #gl key=val ...
+        try:
+            pairs = _parse_kv_pairs(tokens, lineno)
+        except ValueError as e:
+            self.add_e10(str(e))
+            return
+
+        for k, v in pairs:
+            if k == "mapping":
+                if v not in VALID_MAPPINGS:
+                    self.add_e10(f'line {lineno}: invalid mapping "{v}" (expected commands, dataflow, or typed)')
+                else:
+                    self.graph_attrs["gl_mapping"] = v
+            elif k == "prologue":
+                self.graph_attrs["gl_prologue"] = v
+            elif k == "shell":
+                if v not in VALID_SHELLS:
+                    self.add_e10(f'line {lineno}: unsupported shell "{v}"')
+                else:
+                    self.graph_attrs["gl_shell"] = v
+            else:
+                self.add_e10(f'line {lineno}: unknown graph pragma key "{k}"')
+
+    def parse(self) -> Model:
+        for lineno, line in enumerate(self.src.splitlines(), start=1):
+            code, comment, comment_col = _split_modl_comment(line)
+            has_pragma = False
+            pragma_body = ""
+            if comment is not None and comment.startswith("gl") and (
+                len(comment) == 2 or comment[2] in " \t"
+            ):
+                has_pragma = True
+                pragma_body = comment[2:]
+
+            if code.strip() == "":
+                if has_pragma:
+                    self.handle_whole_line_pragma(pragma_body, lineno)
+                continue
+
+            arrow_spans = _split_modl_arrows(code)
+            if arrow_spans is not None:
+                self._parse_edge_line(line, code, arrow_spans, has_pragma, pragma_body, comment_col, lineno)
+            else:
+                self._parse_node_line(line, code, has_pragma, pragma_body, comment_col, lineno)
+
+        if len(self.scope_stack) > 1:
+            unclosed = self.scope_stack[-1].cluster
+            self.add_e10(f'unbalanced #gl begin "{unclosed}" (missing #gl end)')
+
+        return Model(
+            nodes=self.nodes,
+            edges=self.edges,
+            clusters=self.clusters,
+            graph_attrs=self.graph_attrs,
+            directed=True,
+            lang="modl",
+            role_shapes=dict(MODL_ROLE_SHAPES),
+            line_styles=dict(MODL_STYLE_KINDS),
+            problems=self.problems,
+            warnings=self.warnings,
+            raw_lines=self.raw_lines,
+        )
+
+    def _parse_node_line(self, line: str, code: str, has_pragma: bool,
+                         pragma_body: str, comment_col: int, lineno: int):
+        words = _tokenize_modl_segment(code)
+        if not words:
+            return
+
+        # Background directive: `background <color|none|url>` with no text and no pragma
+        if (
+            not has_pragma
+            and len(words) == 2
+            and not words[0].quoted
+            and words[0].val == "background"
+            and not words[1].quoted
+            and (words[1].val in MODL_COLORS or words[1].val == "none" or _is_modl_url(words[1]))
+        ):
+            return
+
+        nid = self.validate_id(words[0], lineno)
+
+        # Greedy slot matching: size, color, shape, url
+        size = color = shape = url = None
+        idx = 1
+        while idx < len(words):
+            w = words[idx]
+            if w.quoted:
+                break
+            if size is None and w.val in MODL_SIZES:
+                size = w.val
+                idx += 1
+                continue
+            if color is None and w.val in MODL_COLORS:
+                color = w.val
+                idx += 1
+                continue
+            if shape is None and w.val in MODL_SHAPES:
+                shape = w.val
+                idx += 1
+                continue
+            if url is None and _is_modl_url(w):
+                url = w.val
+                idx += 1
+                continue
+            break
+
+        raw_text: str | None = None
+        display_text = ""
+        if idx < len(words):
+            raw_text = code[words[idx].start:].strip()
+            if raw_text == '""':
+                raw_text = ""
+            display_text = " ".join(re.sub(r"\s+", " ", w.val.strip()) for w in words[idx:]).strip()
+
+        if url and url.startswith("/"):
+            self.warnings.append(
+                f'line {lineno}: warning: "{url}" filled the URL slot, not command text (quote it to include in command)'
+            )
+        if len(display_text) > 22:
+            self.warnings.append(
+                f'line {lineno}: warning: node "{nid}" label is {len(display_text)} chars (> 22 chars truncated in modl)'
+            )
+
+        pairs: list[tuple[str, str]] = []
+        if has_pragma:
+            try:
+                ptoks = _parse_pragma_tokens(pragma_body, lineno)
+                if not ptoks:
+                    self.add_e10(f"line {lineno}: empty #gl pragma")
+                else:
+                    pairs = _parse_kv_pairs(ptoks, lineno)
+            except ValueError as e:
+                self.add_e10(str(e))
+
+        if nid in self.clusters:
+            if raw_text is not None:
+                self._standin_text[nid] = raw_text
+                cl = self.clusters[nid]
+                if cl.attrs.get("gl_role") in ("for", "while", "until") and "gl_loop" not in cl.attrs:
+                    cl.attrs["gl_loop"] = raw_text
+            if pairs:
+                self.apply_node_pragmas(None, nid, pairs, lineno)
+            return
+
+        nd = self.ensure_node(nid, lineno)
+        assert nd is not None
+        if shape is not None:
+            nd.attrs["shape"] = shape
+            if shape in MODL_ROLE_SHAPES and nid not in self._explicit_role_nodes:
+                # Shape overrides block default.role unless node has explicit #gl role
+                nd.attrs.pop("gl_role", None)
+        if raw_text is not None:
+            nd.attrs["label"] = raw_text
+        if pairs:
+            self.apply_node_pragmas(nd, nid, pairs, lineno)
+
+    def _parse_edge_line(self, line: str, code: str, spans: list[tuple[int, int]],
+                         has_pragma: bool, pragma_body: str, comment_col: int, lineno: int):
+        if len(spans) < 2:
+            raise GripError(f"Line {lineno}: malformed edge line")
+
+        seg_words: list[list[ModlWord]] = []
+        for s_start, s_end in spans:
+            seg = code[s_start:s_end]
+            if seg.strip() == "":
+                raise GripError(f"Line {lineno}: malformed edge line")
+            wlist = _tokenize_modl_segment(seg)
+            if not wlist:
+                raise GripError(f"Line {lineno}: malformed edge line")
+            seg_words.append(wlist)
+
+        endpoint_ids: list[str] = []
+        for wlist in seg_words:
+            endpoint_ids.append(self.validate_id(wlist[0], lineno))
+
+        # Parse trailing attributes and text from the LAST segment
+        last_start, last_end = spans[-1]
+        last_words = seg_words[-1]
+        style = color = url = None
+        color_span: tuple[int, int] | None = None
+        idx = 1
+        while idx < len(last_words):
+            w = last_words[idx]
+            if w.quoted:
+                break
+            if style is None and w.val in MODL_LINE_STYLES:
+                style = w.val
+                idx += 1
+                continue
+            if color is None and w.val in MODL_COLORS:
+                color = w.val
+                color_span = (last_start + w.start, last_start + w.end)
+                idx += 1
+                continue
+            if url is None and _is_modl_url(w):
+                url = w.val
+                idx += 1
+                continue
+            break
+
+        raw_text: str | None = None
+        display_text = ""
+        if idx < len(last_words):
+            raw_text = code[last_start + last_words[idx].start : last_end].strip()
+            if raw_text == '""':
+                raw_text = ""
+            display_text = " ".join(
+                re.sub(r"\s+", " ", w.val.strip()) for w in last_words[idx:]
+            ).strip()
+
+        color_insert_col = last_start + last_words[0].end
+        self.raw_lines[lineno] = {
+            "kind": "edge",
+            "color_span": color_span,
+            "color_insert_col": color_insert_col,
+        }
+
+        pragma_attrs: dict = {}
+        tail_port: str | None = None
+        head_port: str | None = None
+        if has_pragma:
+            try:
+                ptoks = _parse_pragma_tokens(pragma_body, lineno)
+                if not ptoks:
+                    self.add_e10(f"line {lineno}: empty #gl pragma")
+                else:
+                    pairs = _parse_kv_pairs(ptoks, lineno)
+                    pragma_attrs, tail_port, head_port = self.parse_edge_pragmas(pairs, lineno)
+            except ValueError as e:
+                self.add_e10(str(e))
+
+        if url and url.startswith("/"):
+            self.warnings.append(
+                f'line {lineno}: warning: "{url}" filled the URL slot, not edge text (quote it to include in text)'
+            )
+        if len(display_text) > 22:
+            self.warnings.append(
+                f"line {lineno}: warning: edge label is {len(display_text)} chars (> 22 chars truncated in modl)"
+            )
+        if (
+            (style or "solid") != "dashed"
+            and "gl_edge" not in pragma_attrs
+            and raw_text in ("&&", "||")
+            and self.graph_attrs.get("gl_mapping", "typed") != "dataflow"
+        ):
+            self.warnings.append(
+                f'line {lineno}: warning: solid edge has text "{raw_text}" (use "dashed {raw_text}" for control flow)'
+            )
+
+        for nid in endpoint_ids:
+            self.ensure_node(nid, lineno)
+
+        scope = self.current_scope
+        edge_attrs = dict(scope.edge_def)
+        if style is not None:
+            edge_attrs["style"] = style
+            if style == "dashed":
+                # Explicit dashed style overrides default.edge unless #gl edge= is set
+                edge_attrs.pop("gl_edge", None)
+        if raw_text is not None:
+            edge_attrs["label"] = raw_text
+        edge_attrs.update(pragma_attrs)
+
+        for i in range(len(endpoint_ids) - 1):
+            tn = endpoint_ids[i]
+            hn = endpoint_ids[i + 1]
+            e = Edge(
+                tail=tn,
+                tail_port=tail_port,
+                head=hn,
+                head_port=head_port,
+                attrs=dict(edge_attrs),
+                cluster=scope.cluster,
+                order=self.nextorder(),
+                pos=lineno,
+            )
+            self.edges.append(e)
+
+
+def parse_modl(src: str) -> Model:
+    return ModlParser(src).parse()
+
+
+# ==========================================================================
 # Port / fd helpers
 # ==========================================================================
 def port_to_fd(port):
@@ -412,6 +1135,9 @@ class Engine:
         self.graph_attrs = model.graph_attrs
         self.mapping = self.graph_attrs.get("gl_mapping", "typed")
         self.problems: list[tuple[str, str]] = list(model.problems)
+        self.warnings: list[str] = list(model.warnings)
+        self.offending_nodes: set[str] = set()
+        self.offending_edges: set[int] = set()
         self.prepared = False
 
     # ----- role & edge-kind resolution -----
@@ -500,19 +1226,32 @@ class Engine:
                 if "label" in nd.attrs and nd.attrs["label"].strip() == "":
                     self.problems.append(("E02",
                         f'[E02] node "{nd.id}" has no operation (empty label)'))
+                    self.offending_nodes.add(nd.id)
 
         # classify edges (lightweight) for checks
         data_edges = []   # (tail,head) pipe/data edges between nodes
         ctrl_adj = {}     # control graph
         fd_inputs = {}    # (node, fd) -> count of plain data inputs
+        fd_edges = {}     # (node, fd) -> list of Edge
         captures = {}     # value -> set of producers
+        capture_names = {}  # value -> list of resolved var names
+        capture_edges = {}  # value -> list of Edge
         dups = {}         # node -> list of (srcfd,dstfd)
+        dup_edges = {}    # node -> list of Edge
         redir_fd = {}     # node -> set of fds with a redirect
 
         for e in self.edges:
             te = self.endpoint_role(e.tail)
             he = self.endpoint_role(e.head)
             ge = self.edge_kind(e)
+            if ge == "invalid_control":
+                loc = f"line {e.pos}: " if self.model.lang == "modl" and e.pos else ""
+                txt = e.attrs.get("label", "").strip()
+                self.problems.append(("E11",
+                    f'[E11] {loc}dashed edge {e.tail} -> {e.head} has invalid control text "{txt}" (expected &&, ||, or ;)'))
+                if e.pos:
+                    self.offending_edges.add(e.pos)
+                continue
             if ge in ("seq", "and", "or"):
                 ctrl_adj.setdefault(e.tail, []).append(e.head)
                 ctrl_adj.setdefault(e.head, [])
@@ -524,14 +1263,23 @@ class Engine:
                     if r in ("file", "value"):
                         self.problems.append(("E07",
                             f'[E07] "{who}:{port}" — file nodes have no fd {port_to_fd(port)}'))
+                        self.offending_nodes.add(who)
+                        if e.pos:
+                            self.offending_edges.add(e.pos)
             if te == "value":
                 continue  # varuse ordering
             if he == "value":
                 captures.setdefault(e.head, set()).add(e.tail)
+                vname = e.attrs.get("gl_name") or self.nodes[e.head].attrs.get("gl_name") or e.head
+                capture_names.setdefault(e.head, []).append(vname)
+                capture_edges.setdefault(e.head, []).append(e)
                 continue
             if te == "file" and he == "file":
                 self.problems.append(("E06",
                     f"[E06] edge {e.tail} -> {e.head}: file -> file has no program between them"))
+                self.offending_nodes.update((e.tail, e.head))
+                if e.pos:
+                    self.offending_edges.add(e.pos)
                 continue
             if te == "file":  # read redirect
                 continue
@@ -543,6 +1291,7 @@ class Engine:
                 s = port_to_fd(e.tail_port)
                 d = port_to_fd(e.head_port)
                 dups.setdefault(e.tail, []).append((s, d))
+                dup_edges.setdefault(e.tail, []).append(e)
                 continue
             # proc -> proc : pipe (or fd routing)
             data_edges.append((e.tail, e.head))
@@ -551,18 +1300,27 @@ class Engine:
             if self.endpoint_role(e.head) == "op":
                 continue
             fd_inputs[(e.head, hfd)] = fd_inputs.get((e.head, hfd), 0) + 1
+            fd_edges.setdefault((e.head, hfd), []).append(e)
 
         # E03
         for (node, fd), cnt in fd_inputs.items():
             if cnt >= 2:
                 self.problems.append(("E03",
                     f'[E03] fd {fd} of "{node}" has {cnt} inputs; use fan-in (gl_role=op / cat)'))
+                self.offending_nodes.add(node)
+                for e in fd_edges.get((node, fd), []):
+                    if e.pos:
+                        self.offending_edges.add(e.pos)
 
         # E08
         for v, prods in captures.items():
             if len(prods) >= 2:
                 self.problems.append(("E08",
                     f'[E08] value "{v}" captured by {len(prods)} commands'))
+                self.offending_nodes.add(v)
+                for e in capture_edges.get(v, []):
+                    if e.pos:
+                        self.offending_edges.add(e.pos)
 
         # E09
         for node, dl in dups.items():
@@ -571,12 +1329,22 @@ class Engine:
             if not ok_single or conflict:
                 self.problems.append(("E09",
                     f'[E09] fd dups on "{node}" are order-sensitive; use gl_raw'))
+                self.offending_nodes.add(node)
+                for e in dup_edges.get(node, []):
+                    if e.pos:
+                        self.offending_edges.add(e.pos)
 
         # E05 control cycle
         cyc = find_cycle(ctrl_adj)
         if cyc:
             self.problems.append(("E05",
                 f'[E05] ordering cycle among {",".join(cyc)}'))
+            cset = set(cyc)
+            self.offending_nodes.update(cset)
+            for e in self.edges:
+                if e.tail in cset and e.head in cset and self.edge_kind(e) in ("seq", "and", "or"):
+                    if e.pos:
+                        self.offending_edges.add(e.pos)
 
         # E04 data cycle (unless coproc/loop declared)
         dadj = {}
@@ -589,6 +1357,35 @@ class Engine:
             b = dcyc[1] if len(dcyc) > 1 else dcyc[0]
             self.problems.append(("E04",
                 f"[E04] data cycle {a} -> {b} -> {a} without loop/coproc semantics"))
+            cset = set(dcyc)
+            self.offending_nodes.update(cset)
+            for e in self.edges:
+                if e.tail in cset and e.head in cset and self.edge_kind(e) not in ("seq", "and", "or"):
+                    if e.pos:
+                        self.offending_edges.add(e.pos)
+
+        # E12: value / function name must be a valid shell identifier
+        for cid, cl in self.clusters.items():
+            if self.cluster_kind(cid) == "function":
+                fname = cl.attrs.get("gl_name", cid)
+                if not _VALID_SHELL_ID.match(fname):
+                    self.problems.append(("E12",
+                        f'[E12] function name "{fname}" is not a valid shell identifier'))
+        for v, names in capture_names.items():
+            for vname in names:
+                if not _VALID_SHELL_ID.match(vname):
+                    self.problems.append(("E12",
+                        f'[E12] variable name "{vname}" is not a valid shell identifier'))
+                    self.offending_nodes.add(v)
+                    break
+        for nid, nd in self.nodes.items():
+            if nd.role == "value" and nid not in captures:
+                label = nd.attrs.get("label", nd.id)
+                vname = label.split("=", 1)[0] if "=" in label else nd.attrs.get("gl_name", nd.id)
+                if not _VALID_SHELL_ID.match(vname):
+                    self.problems.append(("E12",
+                        f'[E12] variable name "{vname}" is not a valid shell identifier'))
+                    self.offending_nodes.add(nid)
 
         return self.problems
 
@@ -1021,7 +1818,8 @@ class Engine:
         label = nd.attrs.get("label", nd.id)
         if "=" in label:
             return label
-        return f"{nd.id}={label}"
+        name = nd.attrs.get("gl_name", nd.id)
+        return f"{name}={label}"
 
     def file_path(self, nid):
         nd = self.nodes.get(nid)
@@ -1123,14 +1921,45 @@ def find_cycle(adj):
 
 
 # ==========================================================================
-# Front-end dispatcher & CLI
+# Share-link decoding & Front-end dispatcher
 # ==========================================================================
+def is_url_arg(arg: str) -> bool:
+    return arg.startswith(("http://", "https://"))
+
+
+def decode_share_link(url: str) -> str:
+    parsed = urllib.parse.urlparse(url)
+    frag = parsed.fragment
+    if frag.startswith("h1="):
+        b64 = frag[3:].split("&", 1)[0]
+        try:
+            pad = "=" * (-len(b64) % 4)
+            raw = base64.urlsafe_b64decode(b64 + pad).decode("utf-8")
+            data = json.loads(raw)
+            if isinstance(data, dict) and isinstance(data.get("src"), str):
+                return data["src"]
+        except Exception as e:
+            raise GripError(f"invalid #h1 share link payload: {e}")
+        raise GripError("invalid #h1 share link: missing 'src' field")
+    raise GripError(
+        "256t CID share links require network access to HashBin; use an #h1= inline share link"
+    )
+
+
+def encode_share_link(src: str, base_url: str = "https://modl.hashbin.page/") -> str:
+    payload = json.dumps({"src": src, "pos": {}}, separators=(",", ":")).encode("utf-8")
+    b64 = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+    return f"{base_url}#h1={b64}"
+
+
 def detect_lang(path: str | None, src: str, lang: str | None = None) -> str:
     if lang:
         if lang not in ("dot", "modl"):
             raise GripError(f"unknown language {lang!r}")
         return lang
     if path:
+        if is_url_arg(path):
+            return "modl"
         ext = os.path.splitext(path)[1].lower()
         if ext == ".modl":
             return "modl"
@@ -1145,12 +1974,20 @@ def detect_lang(path: str | None, src: str, lang: str | None = None) -> str:
 def parse_source(src: str, lang: str = "dot") -> Model:
     if lang == "dot":
         return parse_dot(src)
+    if lang == "modl":
+        return parse_modl(src)
     raise GripError(f"unsupported language {lang!r}")
 
 
-def build_engine(path, lang: str | None = None):
+def read_input_source(path: str) -> str:
+    if is_url_arg(path):
+        return decode_share_link(path)
     with open(path) as f:
-        src = f.read()
+        return f.read()
+
+
+def build_engine(path: str, lang: str | None = None) -> Engine:
+    src = read_input_source(path)
     resolved_lang = detect_lang(path, src, lang=lang)
     model = parse_source(src, resolved_lang)
     return Engine(model)
@@ -1163,12 +2000,41 @@ def emit_diagnostics(path, problems, stream=sys.stderr):
     print("exit status: 65", file=stream)
 
 
-def annotate(engine, path, problems, out_path):
+def _format_modl_id(nid: str) -> str:
+    if _VALID_MODL_ID.match(nid):
+        return nid
+    return f'"{nid}"'
+
+
+def annotate(engine: Engine, path: str, problems, out_path: str):
+    src = read_input_source(path)
+    if engine.model.lang == "modl":
+        lines = src.splitlines()
+        for lineno in sorted(engine.offending_edges):
+            meta = engine.model.raw_lines.get(lineno)
+            if meta and 1 <= lineno <= len(lines):
+                ln = lines[lineno - 1]
+                cspan = meta.get("color_span")
+                if cspan is not None:
+                    s, e = cspan
+                    lines[lineno - 1] = ln[:s] + "red" + ln[e:]
+                else:
+                    col = meta["color_insert_col"]
+                    lines[lineno - 1] = ln[:col] + " red" + ln[col:]
+        for nid in sorted(
+            engine.offending_nodes,
+            key=lambda x: engine.nodes[x].order if x in engine.nodes else 0,
+        ):
+            lines.append(f"{_format_modl_id(nid)} red")
+        for _code, msg in problems:
+            lines.append(f"# {msg}")
+        with open(out_path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        return
+
     # Produce a diagnostic-annotated copy of the dot file. Best-effort: append
     # gl_error / color hints as a trailing comment block plus per-element attrs
     # for offending nodes referenced in messages.
-    with open(path) as f:
-        src = f.read()
     notes = ["/* gripeline diagnostics */"]
     for code, msg in problems:
         notes.append(f"// {msg}")
@@ -1196,19 +2062,19 @@ def main(argv):
             rest.append(a)
 
     if not rest:
-        print("usage: gripeline {build|run|check} <file.dot>", file=sys.stderr)
+        print("usage: gripeline {build|run|check} <file.dot|file.modl>", file=sys.stderr)
         return 2
     cmd = rest[0]
     if cmd not in ("build", "run", "check"):
-        # allow `gripeline file.dot` -> build
-        if os.path.exists(cmd):
+        # allow `gripeline file.dot` or `gripeline file.modl` -> build
+        if os.path.exists(cmd) or is_url_arg(cmd):
             rest = ["build"] + rest
             cmd = "build"
         else:
             print(f"unknown command {cmd!r}", file=sys.stderr)
             return 2
     if len(rest) < 2:
-        print("missing <file.dot>", file=sys.stderr)
+        print("missing <file.dot|file.modl>", file=sys.stderr)
         return 2
     path = rest[1]
 
@@ -1220,9 +2086,16 @@ def main(argv):
 
     problems = engine.run_checks()
 
+    for w in engine.warnings:
+        print(f"gripeline: {w}", file=sys.stderr)
+
     if flags["annotate"] and problems:
-        out_path = flags["annotate"] if isinstance(flags["annotate"], str) \
-            else (os.path.splitext(path)[0] + ".annotated.dot")
+        if isinstance(flags["annotate"], str):
+            out_path = flags["annotate"]
+        else:
+            ext = ".annotated.modl" if engine.model.lang == "modl" else ".annotated.dot"
+            base = "share" if is_url_arg(path) else os.path.splitext(path)[0]
+            out_path = base + ext
         annotate(engine, path, problems, out_path)
 
     if cmd == "check":
