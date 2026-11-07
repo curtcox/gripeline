@@ -11,6 +11,12 @@ digraph {
     a -> b
   }
 }
+=== modl ===
+#gl begin cluster_pure default.role=value default.edge=seq
+a x=1
+b y=2
+a -> b
+#gl end
 === bash ===
 x=1
 y=2

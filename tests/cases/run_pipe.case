@@ -7,6 +7,12 @@ runnable: true
 digraph { gl_mapping="commands"
   a[label="seq 1 5"] b[label="grep -v 3"] c[label="wc -l"]
   a -> b -> c }
+=== modl ===
+#gl mapping=commands
+a square seq 1 5
+b square grep -v 3
+c square wc -l
+a -> b -> c
 === bash ===
 seq 1 5
 grep -v 3

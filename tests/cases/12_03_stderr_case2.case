@@ -7,5 +7,10 @@ digraph {
   make[label="make"] g[label="grep -i error"]
   make:err -> make:out
   make:out -> g }
+=== modl ===
+make square make
+g    square grep -i error
+make -> make #gl from=err to=out
+make -> g    #gl from=out
 === bash ===
 make 2>&1 | grep -i error

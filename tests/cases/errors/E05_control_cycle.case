@@ -8,5 +8,10 @@ digraph {
   a -> b [gl_edge=seq]
   b -> a [gl_edge=seq]
 }
+=== modl ===
+a square step-a
+b square step-b
+a -> b dashed
+b -> a dashed
 === error ===
 ordering cycle

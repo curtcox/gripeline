@@ -1,0 +1,8 @@
+name: modl-parse-invalid-node-id
+spec: 14
+expect: error
+code: parse
+=== modl ===
+@bad square echo hi
+=== error ===
+Line 1: invalid node id "@bad"

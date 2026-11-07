@@ -12,6 +12,15 @@ digraph {
   call[label="backup"] out[shape=note,label="out.tgz.gpg"]
   call -> out
 }
+=== modl ===
+#gl begin cluster_backup role=function name=backup
+t square tar czf - "$DIR"
+g square gpg -e
+t -> g
+#gl end
+call square backup
+out  hex    out.tgz.gpg
+call -> out
 === bash ===
 backup() {
 tar czf - "$DIR" | gpg -e

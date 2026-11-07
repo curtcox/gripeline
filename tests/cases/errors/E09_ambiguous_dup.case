@@ -8,5 +8,9 @@ digraph {
   cmd:out -> cmd:err
   cmd:err -> cmd:out
 }
+=== modl ===
+cmd square cmd
+cmd -> cmd #gl from=out to=err
+cmd -> cmd #gl from=err to=out
 === error ===
 order-sensitive

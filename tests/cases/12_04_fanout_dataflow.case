@@ -9,6 +9,15 @@ digraph { gl_mapping="dataflow"
   sorted -> last  [label="tail -1"]
   data[shape=note,label="data.txt"] sorted[shape=note,label="sorted.txt"]
   first[shape=note,label="first.txt"] last[shape=note,label="last.txt"] }
+=== modl ===
+#gl mapping=dataflow
+data   -> sorted sort
+sorted -> first  head -1
+sorted -> last   tail -1
+data   hex data.txt
+sorted hex sorted.txt
+first  hex first.txt
+last   hex last.txt
 === bash ===
 sort
 tee

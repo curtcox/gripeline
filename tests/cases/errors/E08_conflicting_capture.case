@@ -9,5 +9,11 @@ digraph {
   a -> v [gl_name="v"]
   b -> v [gl_name="v"]
 }
+=== modl ===
+a square  cmd-a
+b square  cmd-b
+v diamond #gl name=v
+a -> v #gl name=v
+b -> v #gl name=v
 === error ===
 captured

@@ -7,6 +7,10 @@ digraph { gl_mapping="commands"
   a[label="long-task", gl_async=true]
   b[label="other-task"]
 }
+=== modl ===
+#gl mapping=commands
+a square long-task  #gl async=true
+b square other-task
 === bash ===
 long-task &
 other-task

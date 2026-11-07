@@ -10,6 +10,10 @@ digraph {
     e[label="echo $i"]
   }
 }
+=== modl ===
+#gl begin cluster_e loop="for i in 1 2 3"
+e square echo $i
+#gl end
 === bash ===
 for i in 1 2 3
 echo $i

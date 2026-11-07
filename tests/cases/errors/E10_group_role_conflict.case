@@ -1,0 +1,11 @@
+name: E10-group-role-conflict
+spec: 9
+expect: error
+code: E10
+=== modl ===
+#gl begin grp role=subshell
+a square echo hi
+#gl end
+grp square #gl role=program
+=== error ===
+group id

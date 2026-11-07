@@ -10,6 +10,12 @@ digraph {
     a -> b [gl_edge=seq]
   }
 }
+=== modl ===
+#gl begin cluster_g role=subshell
+a square cd /tmp
+b square ls
+a -> b dashed
+#gl end
 === bash ===
 cd /tmp
 ls

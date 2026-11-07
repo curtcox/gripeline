@@ -1,0 +1,15 @@
+name: modl-url-slot-gotcha
+mapping: commands
+spec: 14
+expect: bash
+=== modl ===
+#gl mapping=commands
+# Unquoted /usr/bin/echo fills the URL slot, leaving only "hello" as the command text
+a square /usr/bin/echo echo hello
+# Quoted "/bin/cat" is not a URL slot; it starts the command text
+b square "/bin/cat" -u
+a -> b
+=== bash ===
+echo hello | "/bin/cat" -u
+=== stderr ===
+URL slot

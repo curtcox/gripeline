@@ -1,0 +1,8 @@
+name: modl-parse-malformed-edge
+spec: 14
+expect: error
+code: parse
+=== modl ===
+a ->
+=== error ===
+malformed edge line

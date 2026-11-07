@@ -8,5 +8,9 @@ digraph {
   log[shape=note,label="out.log"]
   make -> log:err
 }
+=== modl ===
+make square make
+log  hex    out.log
+make -> log #gl to=err
 === error ===
 file

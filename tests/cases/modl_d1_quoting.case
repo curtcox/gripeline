@@ -1,0 +1,12 @@
+name: modl-d1-raw-quoting-and-comments
+mapping: commands
+spec: 14
+expect: bash
+=== modl ===
+#gl mapping=commands # leading comment after pragma
+# full-line comment
+a square echo "hello # not a comment"   # trailing comment
+b square tr 'a-z' 'A-Z'
+a -> b
+=== bash ===
+echo "hello # not a comment" | tr 'a-z' 'A-Z'

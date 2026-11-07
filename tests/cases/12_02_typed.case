@@ -7,5 +7,11 @@ digraph {
   in[shape=note,label="access.log"] out[shape=note,label="counts.txt"]
   g[label="grep 404"] w[label="wc -l"]
   in -> g -> w -> out }
+=== modl ===
+in  hex    access.log
+out hex    counts.txt
+g   square grep 404
+w   square wc -l
+in -> g -> w -> out
 === bash ===
 grep 404 < access.log | wc -l > counts.txt

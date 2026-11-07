@@ -6,5 +6,11 @@ expect: bash
 digraph { gl_mapping="commands"
   a[label="cat access.log"] b[label="grep 404"] c[label="wc -l"]
   a -> b -> c }
+=== modl ===
+#gl mapping=commands
+a square cat access.log
+b square grep 404
+c square wc -l
+a -> b -> c
 === bash ===
 cat access.log | grep 404 | wc -l

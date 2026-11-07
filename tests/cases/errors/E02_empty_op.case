@@ -8,5 +8,9 @@ digraph {
   b[label=""]
   a -> b
 }
+=== modl ===
+a square echo hi
+b square ""
+a -> b
 === error ===
 no operation

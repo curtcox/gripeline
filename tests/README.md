@@ -26,28 +26,33 @@ GRIPELINE=./gripeline            python3 tests/run.py
 GRIPELINE='python3 gripeline.py' python3 tests/run.py
 ```
 
-The harness invokes `$GRIPELINE <subcmd> <file.dot>`, where `<subcmd>` defaults
-to `build` (override via `GRIPELINE_SUBCMD`; set it empty to omit). `build` must
-print the transpiled bash to stdout, run the §9 static check first, and exit
-non-zero with diagnostics on stderr for a non-executable graph.
+The harness invokes `$GRIPELINE <subcmd> <file.dot|file.modl>`, where `<subcmd>`
+defaults to `build` (override via `GRIPELINE_SUBCMD`; set it empty to omit).
+`build` must print the transpiled bash to stdout, run the §9 static check first,
+and exit non-zero with diagnostics on stderr for a non-executable graph.
 
 **Without** `GRIPELINE` set, the transpile/run checks are skipped but every case
-is still validated for dot-validity and (for exact cases) bash-lint — so the
+is still validated for dot/modl validity and (for exact cases) bash-lint — so the
 fixtures themselves are always checked.
 
 ## What each case is checked for
 
-| check       | when it runs                         | what it verifies |
-|-------------|--------------------------------------|------------------|
-| `dot-valid` | always                               | `=== dot ===` parses with Graphviz (`dot -Tcanon`); falls back to a brace check if `dot` is absent |
-| `lint`      | exact-bash cases                     | the `=== bash ===` expectation is itself valid bash (`bash -n`) |
-| `transpile` | when `GRIPELINE` is set              | transpiler output matches the expectation (see modes below) |
-| `run`       | `runnable: true` + `GRIPELINE` set   | the produced bash, when executed, prints the `=== stdout ===` section |
+| check            | when it runs                         | what it verifies |
+|------------------|--------------------------------------|------------------|
+| `dot-valid`      | when `=== dot ===` is present        | `=== dot ===` parses with Graphviz (`dot -Tcanon`); falls back to a brace check if `dot` is absent |
+| `modl-valid`     | when `=== modl ===` is present       | `=== modl ===` parses with modl (`$MODL_REPO` if set, else gripeline's modl parser) |
+| `lint`           | exact-bash cases                     | the `=== bash ===` expectation is itself valid bash (`bash -n`) |
+| `transpile`      | when `GRIPELINE` is set              | transpiler output matches the expectation (see modes below) |
+| `modl-transpile` | twin cases (`dot` + `modl`)          | `.modl` source transpiles to the same expected bash/error as `.dot` |
+| `run`            | `runnable: true` + `GRIPELINE` set   | the produced bash, when executed, prints the `=== stdout ===` section |
+| `modl-run`       | twin runnable cases                  | the bash produced from `=== modl ===` prints `=== stdout ===` |
 
 ## The `.case` file format
 
 A case is a small text file: `key: value` headers, then one or more
-`=== section ===` blocks.
+`=== section ===` blocks. A case may contain `=== dot ===`, `=== modl ===`, or
+both (a *twin* case that proves dot/modl parity against the same `=== bash ===`
+and `=== stdout ===`).
 
 ```
 name: 12.2-redirect-typed     # unique name (used for filtering & reporting)
@@ -55,7 +60,13 @@ mapping: typed                # informational: which mapping the example uses
 spec: 12.2                    # informational: section of SPEC.md
 expect: bash                  # bash | contains | error
 === dot ===
-digraph { ... }               # the gripeline source
+digraph { ... }               # the dot source
+=== modl ===
+in  hex    access.log         # the equivalent modl source
+out hex    counts.txt
+g   square grep 404
+w   square wc -l
+in -> g -> w -> out
 === bash ===
 grep 404 < access.log | wc -l > counts.txt
 ```
@@ -75,8 +86,9 @@ grep 404 < access.log | wc -l > counts.txt
   Keep the patterns small and robust (`for f in *.txt`, not a whole `do…done`).
 
 - **`expect: error`** — the transpiler must exit non-zero; the `code:` header (if
-  present) and every line of the `=== error ===` section must appear in the
-  diagnostics. Use for §9 not-executable graphs.
+  present; `code: parse` requires exit status 2) and every line of the
+  `=== error ===` section must appear in the diagnostics. Use for §9
+  not-executable graphs and §14 modl parse errors.
 
 ### Optional headers / sections
 
@@ -85,6 +97,7 @@ grep 404 < access.log | wc -l > counts.txt
   only coreutils so no stubs are needed; drop fake commands into `tests/stubs/`
   if a case needs them.
 - `keep-prologue: true` — include the prologue in exact comparison.
+- `=== stderr ===` — expected warning/diagnostic substrings on stderr.
 
 ## Adding a case
 

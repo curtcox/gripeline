@@ -1,0 +1,10 @@
+name: E11-dashed-invalid-text
+spec: 9
+expect: error
+code: E11
+=== modl ===
+a square make
+b square make install
+a -> b dashed then
+=== error ===
+invalid control text

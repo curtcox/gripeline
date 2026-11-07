@@ -8,5 +8,9 @@ digraph {
   f[shape=note,label="log.txt",gl_append=true]
   c -> f
 }
+=== modl ===
+c square echo hi
+f hex    log.txt #gl append=true
+c -> f
 === bash ===
 echo hi >> log.txt

@@ -6,5 +6,10 @@ expect: bash
 digraph {
   log[shape=note,label="access.log"] g[label="grep 404"] w[label="wc -l"]
   log -> g -> w }
+=== modl ===
+log hex    access.log
+g   square grep 404
+w   square wc -l
+log -> g -> w
 === bash ===
 grep 404 < access.log | wc -l

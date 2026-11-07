@@ -8,5 +8,10 @@ digraph {
   a -> b
   b -> a
 }
+=== modl ===
+a square proc-a
+b square proc-b
+a -> b
+b -> a
 === error ===
 cycle

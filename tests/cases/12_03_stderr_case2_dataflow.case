@@ -6,5 +6,9 @@ expect: bash
 digraph { gl_mapping="dataflow"
   build -> errs [label="grep -i error", gl_stderr="2>&1"]
   build[label="make"] }
+=== modl ===
+#gl mapping=dataflow
+build -> errs grep -i error #gl stderr="2>&1"
+build make
 === bash ===
 make 2>&1 | grep -i error

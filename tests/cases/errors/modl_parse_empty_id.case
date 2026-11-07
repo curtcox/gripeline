@@ -1,0 +1,8 @@
+name: modl-parse-empty-node-id
+spec: 14
+expect: error
+code: parse
+=== modl ===
+"" square echo hi
+=== error ===
+empty node id

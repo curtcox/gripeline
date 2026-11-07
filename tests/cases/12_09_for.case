@@ -9,6 +9,10 @@ digraph {
     z[label="gzip -k \"$f\""]
   }
 }
+=== modl ===
+#gl begin each loop="for f in *.txt"
+z square gzip -k "$f"
+#gl end
 === bash ===
 for f in *.txt
 gzip -k "$f"

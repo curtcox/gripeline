@@ -8,6 +8,12 @@ digraph { gl_mapping="dataflow"
   ver -> announced [label="echo \"building $ver\""]
   announced -> log [label="tee"]
   log[shape=note,label="build.log"] }
+=== modl ===
+#gl mapping=dataflow
+ver $(git describe --tags)
+ver       -> announced echo "building $ver"
+announced -> log       tee
+log hex build.log
 === bash ===
 git describe --tags
 echo "building $ver"

@@ -1,0 +1,16 @@
+name: E12-invalid-shell-identifier
+spec: 9
+expect: error
+code: E12
+=== dot ===
+digraph {
+  git[label="git describe --tags"]
+  "my-var"[gl_role=value, shape=oval]
+  git -> "my-var"
+}
+=== modl ===
+git    square  git describe --tags
+my-var diamond
+git -> my-var
+=== error ===
+not a valid shell identifier

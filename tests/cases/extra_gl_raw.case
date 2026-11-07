@@ -6,5 +6,7 @@ expect: contains
 digraph {
   r[gl_raw="for i in 1 2 3; do echo $i; done"]
 }
+=== modl ===
+r square #gl raw="for i in 1 2 3; do echo $i; done"
 === bash ===
 for i in 1 2 3; do echo $i; done

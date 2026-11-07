@@ -1,0 +1,15 @@
+name: modl-quoted-ids-and-redefinition
+mapping: typed
+spec: 14
+expect: bash
+=== modl ===
+background white
+"first step" square echo start
+"first step" big blue                  # redefinition keeps shape and text
+"second step" circle wc -c
+#gl node "first step" role=program
+#gl node out role=file append=true
+out hex result.txt
+"first step" -> "second step" -> out
+=== bash ===
+echo start | wc -c >> result.txt

@@ -8,5 +8,9 @@ digraph {
   trace[shape=note,label="trace.out"]
   gen:3 -> trace
 }
+=== modl ===
+gen   square gen
+trace hex    trace.out
+gen -> trace #gl from=3
 === bash ===
 gen 3> trace.out

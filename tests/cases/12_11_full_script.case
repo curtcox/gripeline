@@ -24,6 +24,25 @@ digraph deploy {
   tee -> blog
   ver -> cluster_each
 }
+=== modl ===
+#gl prologue="set -euo pipefail"
+git square  git describe --tags
+ver diamond #gl name=ver
+git -> ver  #gl name=ver
+#gl begin each loop="for svc in api web worker"
+build square docker build -t "$svc:$ver" "./$svc"
+push  square docker push "$svc:$ver"
+fail  square echo "FAILED $svc"
+flog  hex    failures.log #gl append=true
+build -> push dashed &&
+push  -> fail dashed ||
+fail  -> flog
+#gl end
+each -> tee
+tee  square tee
+blog hex    build.log
+tee  -> blog
+ver  -> each dashed
 === bash ===
 ver=$(git describe --tags)
 for svc in api web worker

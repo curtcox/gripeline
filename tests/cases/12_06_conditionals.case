@@ -8,5 +8,11 @@ digraph {
   make -> inst [gl_edge=and, style=dashed, color=darkgreen]
   inst -> fail [gl_edge=or,  style=dashed, color=orange]
 }
+=== modl ===
+make square make
+inst square make install
+fail square echo FAIL
+make -> inst dashed green &&
+inst -> fail dashed orange ||
 === bash ===
 make && make install || echo FAIL

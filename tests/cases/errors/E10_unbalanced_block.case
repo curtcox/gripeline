@@ -1,0 +1,9 @@
+name: E10-unbalanced-block
+spec: 9
+expect: error
+code: E10
+=== modl ===
+#gl begin unclosed role=subshell
+a square echo hi
+=== error ===
+unbalanced

@@ -11,6 +11,15 @@ digraph {
   ver -> echo
   echo -> tee -> log
 }
+=== modl ===
+git  square  git describe --tags
+ver  diamond #gl name=ver
+echo square  echo "building $ver"
+tee  square  tee
+log  hex     build.log
+git -> ver #gl name=ver
+ver -> echo
+echo -> tee -> log
 === bash ===
 ver=$(git describe --tags)
 echo "building $ver"

@@ -7,5 +7,9 @@ digraph {
   errlog[shape=note,label="build.err"]
   make[label="make"]
   make:err -> errlog }
+=== modl ===
+errlog hex    build.err
+make   square make
+make -> errlog #gl from=err
 === bash ===
 make 2> build.err

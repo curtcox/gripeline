@@ -13,6 +13,14 @@ digraph {
   }
   sort -> cluster_ping
 }
+=== modl ===
+hosts hex    hosts
+sort  square sort
+hosts -> sort
+#gl begin ping loop="while read h"
+p square ping -c1 "$h"
+#gl end
+sort -> ping
 === bash ===
 sort
 hosts

@@ -1,0 +1,20 @@
+name: modl-shapes-and-standin
+mapping: typed
+spec: 14
+expect: contains
+=== modl ===
+ver diamond v=1.0
+buf triangle cat
+out hex out.log
+#gl begin grp loop="for x in a b"
+each_cmd none echo "$x:$v"
+#gl end
+# Stand-in node for group styled visually
+grp big diamond for each x
+ver -> grp dashed ;
+grp -> buf -> out
+=== bash ===
+v=1.0
+for x in a b
+echo "$x:$v"
+done | cat > out.log

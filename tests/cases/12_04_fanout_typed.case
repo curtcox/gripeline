@@ -15,6 +15,20 @@ digraph {
   s -> t
   t -> last
 }
+=== modl ===
+data   hex    data.txt
+sorted hex    sorted.txt
+first  hex    first.txt
+last   hex    last.txt
+s      square sort
+h      square head -1
+t      square tail -1
+data -> s
+s -> sorted
+s -> h
+h -> first
+s -> t
+t -> last
 === bash ===
 sort
 tee

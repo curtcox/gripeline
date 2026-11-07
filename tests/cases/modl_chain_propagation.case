@@ -1,0 +1,13 @@
+name: modl-chain-propagation
+mapping: commands
+spec: 14
+expect: bash
+=== modl ===
+#gl mapping=commands
+a square test -f input.txt
+b square cp input.txt backup.txt
+c square echo copied
+# Words after id in earlier segments are dropped; trailing style+text apply to all edges
+a ignored words -> b more ignored -> c dashed &&
+=== bash ===
+test -f input.txt && cp input.txt backup.txt && echo copied

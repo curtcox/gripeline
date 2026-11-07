@@ -8,5 +8,9 @@ digraph {
   y[shape=note,label="b.txt"]
   x -> y
 }
+=== modl ===
+x hex a.txt
+y hex b.txt
+x -> y
 === error ===
 no program

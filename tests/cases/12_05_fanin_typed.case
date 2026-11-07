@@ -12,6 +12,15 @@ digraph {
   c2 -> merge
   merge -> s -> u
 }
+=== modl ===
+c1    square curl -s host1/metrics
+c2    square curl -s host2/metrics
+merge square cat #gl role=op
+s     square sort
+u     square uniq -c
+c1 -> merge
+c2 -> merge
+merge -> s -> u
 === bash ===
 cat
 <(

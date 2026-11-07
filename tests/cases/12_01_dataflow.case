@@ -7,5 +7,10 @@ digraph { gl_mapping="dataflow"
   access_log -> hits [label="grep 404"]
   hits -> n          [label="wc -l"]
   access_log [shape=note,label="access.log"] }
+=== modl ===
+#gl mapping=dataflow
+access_log -> hits grep 404
+hits       -> n    wc -l
+access_log hex access.log
 === bash ===
 grep 404 < access.log | wc -l

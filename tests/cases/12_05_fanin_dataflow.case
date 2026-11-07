@@ -8,6 +8,11 @@ digraph { gl_mapping="dataflow"
   m2 -> merged [label="curl -s host2/metrics"]
   merged -> counted [label="sort | uniq -c"]
 }
+=== modl ===
+#gl mapping=dataflow
+m1     -> merged  curl -s host1/metrics
+m2     -> merged  curl -s host2/metrics
+merged -> counted sort | uniq -c
 === bash ===
 curl -s host1/metrics
 curl -s host2/metrics

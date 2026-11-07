@@ -1,0 +1,8 @@
+name: E10-bad-pragma-key
+spec: 9
+expect: error
+code: E10
+=== modl ===
+a square echo hi #gl bogus=123
+=== error ===
+unknown node pragma key

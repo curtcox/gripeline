@@ -9,5 +9,10 @@ digraph {
   gen -> proc
   proc -> gen
 }
+=== modl ===
+gen  square generator #gl role=coproc
+proc square processor
+gen  -> proc
+proc -> gen
 === bash ===
 coproc
