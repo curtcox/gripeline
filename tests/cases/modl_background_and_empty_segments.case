@@ -1,0 +1,11 @@
+name: modl-background-and-empty-segments
+mapping: typed
+spec: 14
+expect: bash
+=== modl ===
+blue                                   # a lone color word sets the background
+a square echo hi
+b square wc -c
+a -> -> b                              # modl drops the empty segment
+=== bash ===
+echo hi | wc -c

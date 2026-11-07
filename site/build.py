@@ -105,9 +105,7 @@ def highlight_modl_line(line: str) -> str:
     # Highlight arrows and style/shape keywords in the code portion
     escaped = html.escape(code)
     escaped = escaped.replace("-&gt;", '<span class="modl-arrow">-&gt;</span>')
-    for kw in ("square", "hex", "triangle", "diamond", "circle", "none",
-               "solid", "dashed", "dotted", "bold", "small", "medium", "big",
-               "background"):
+    for kw in sorted(gl_mod.MODL_SHAPES | gl_mod.MODL_LINE_STYLES | gl_mod.MODL_SIZES):
         escaped = re.sub(rf"\b({kw})\b", r'<span class="modl-kw">\1</span>', escaped)
     if comment is not None:
         if comment.startswith("gl") and (len(comment) == 2 or comment[2] in " \t"):

@@ -1,0 +1,16 @@
+name: E13-empty-body
+spec: 9
+expect: error
+code: E13
+=== dot ===
+digraph {
+  build[shape=box label="echo build $s"]
+  subgraph cluster_each { gl_loop="for s in a b"; build }
+}
+=== modl ===
+build square echo build $s             # first mentioned outside the block
+#gl begin each loop="for s in a b"
+build
+#gl end
+=== error ===
+empty body

@@ -1,0 +1,15 @@
+name: modl-slot-order
+mapping: typed
+spec: 14
+expect: bash
+=== modl ===
+# modl fills attribute slots strictly in order: size, line style, color, url.
+mk square make
+in square make install
+mk -> in big dashed &&                 # size then style: a control edge
+t square echo t
+u square cat
+t -> u red dashed                      # style after color is text: a solid pipe
+=== bash ===
+make && make install
+echo t | cat

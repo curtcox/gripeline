@@ -5,8 +5,11 @@ Runs the fixtures under tests/cases/ against a gripeline transpiler and checks,
 for each case:
 
   1. dot-valid   -- the .dot source parses with Graphviz (`dot -Tcanon`).
-  2. modl-valid  -- the .modl source parses with modl (via $MODL_REPO when set,
-                    else gripeline's own modl parser).
+  2. modl-valid  -- the .modl source parses with modl, and (when $MODL_REPO
+                    points at a curtcox/modl checkout and node is installed)
+                    gripeline's parse matches modl's own parser: same nodes,
+                    shapes, text and edges. Without MODL_REPO, only
+                    gripeline's own modl parser is used.
   3. lint        -- the *expected* bash is itself valid bash (`bash -n`).
                     (proves the fixtures are sound even before a transpiler exists)
   4. transpile   -- the transpiler's output matches expectation (for each
@@ -62,6 +65,10 @@ BASH_BIN = shutil.which("bash") or "/bin/bash"
 GRIPELINE = os.environ.get("GRIPELINE")
 GRIPELINE_SUBCMD = os.environ.get("GRIPELINE_SUBCMD", "build")
 MODL_REPO = os.environ.get("MODL_REPO")
+if MODL_REPO and not (Path(MODL_REPO) / "js" / "editor.js").is_file():
+    print(f"warning: MODL_REPO={MODL_REPO} has no js/editor.js; modl parity check disabled",
+          file=sys.stderr)
+    MODL_REPO = None
 
 # Prologue lines that normalization strips so fixtures can omit boilerplate.
 PROLOGUE = {
@@ -219,56 +226,87 @@ def check_dot_valid(case: Case) -> CheckResult:
     return CheckResult("dot-valid", "PASS", "(brace check only; install graphviz)")
 
 
+MODL_PARSE_JS = ROOT / "modl_parse.cjs"
+
+
 def _run_modl_repo_parser(src: str) -> dict | None:
+    """Parse `src` with modl's real parser (tests/modl_parse.cjs over
+    $MODL_REPO/js/editor.js). None when MODL_REPO or node is unavailable."""
     if not MODL_REPO or not NODE_BIN:
         return None
-    repo = Path(MODL_REPO)
-    export_script = repo / "scripts" / "export-parse.mjs"
-    if export_script.is_file():
-        tmp = write_temp(src, ".modl")
-        try:
-            p = subprocess.run([NODE_BIN, str(export_script), tmp],
-                               capture_output=True, text=True)
-        finally:
-            os.unlink(tmp)
-        if p.returncode == 0 and p.stdout.strip():
-            return json.loads(p.stdout)
-    index_html = repo / "index.html"
-    if index_html.is_file():
-        js = (
-            'const fs = require("fs"), vm = require("vm");'
-            'const html = fs.readFileSync(process.argv[1], "utf8");'
-            'const s = "// === ENGINE START ===", e = "// === ENGINE END ===";'
-            'const i = html.indexOf(s), j = html.indexOf(e);'
-            'if (i < 0 || j < 0) process.exit(2);'
-            'const code = html.slice(i, j) + "\\n;globalThis.__parse = parseSource;";'
-            'vm.runInThisContext(code);'
-            'const src = fs.readFileSync(0, "utf8");'
-            'console.log(JSON.stringify(globalThis.__parse(src)));'
-        )
-        p = subprocess.run([NODE_BIN, "-e", js, str(index_html)],
-                           input=src, capture_output=True, text=True)
-        if p.returncode == 0 and p.stdout.strip():
-            return json.loads(p.stdout)
-    return None
+    p = subprocess.run([NODE_BIN, str(MODL_PARSE_JS), MODL_REPO],
+                       input=json.dumps({"src": src}), capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError(f"modl_parse.cjs failed: {p.stderr.strip()}")
+    return json.loads(p.stdout)["src"]
+
+
+def _modl_display(raw: str | None) -> str:
+    """What modl shows for a raw text slice: word values joined by spaces."""
+    if not raw:
+        return ""
+    return " ".join(w.val for w in gl_mod._lex_modl_line(raw) if w.kind == "word")
+
+
+def modl_parity_diffs(src: str, js: dict) -> list[str]:
+    """Differences between gripeline's modl parse and modl's own parse:
+    node set, shapes, node text, and the edge list (endpoints, line style,
+    text). These are exactly the facts that decide what runs, so any
+    difference means the picture and the program disagree."""
+    m = gl_mod.parse_modl(src)
+    diffs = []
+    jn = js["nodes"]
+    for nid in jn:
+        if nid not in m.nodes and nid not in m.clusters:
+            diffs.append(f"modl draws node {nid!r} but gripeline has no such node or group")
+    for nid in m.nodes:
+        if nid not in jn:
+            diffs.append(f"gripeline has node {nid!r} that modl does not draw")
+    for nid, nd in m.nodes.items():
+        if nid not in jn:
+            continue
+        shape = nd.attrs.get("shape", "circle")
+        if shape != jn[nid]["shape"]:
+            diffs.append(f"node {nid!r}: shape gripeline={shape!r} modl={jn[nid]['shape']!r}")
+        gt, mt = _modl_display(nd.attrs.get("label")), jn[nid]["text"]
+        if gt != mt and not (gt.strip() == "" and mt.strip() == ""):
+            diffs.append(f"node {nid!r}: text gripeline={gt!r} modl={mt!r}")
+    ge = [(e.tail, e.head, e.attrs.get("style", "solid"), _modl_display(e.attrs.get("label")))
+          for e in m.edges]
+    je = [(e["from"], e["to"], e["style"], e["text"]) for e in js["edges"]]
+    if ge != je:
+        diffs.append(f"edges differ:\n  gripeline={ge}\n  modl     ={je}")
+    return diffs
 
 
 def check_modl_valid(case: Case) -> CheckResult:
     modl = case.modl
     if not modl.strip():
         return CheckResult("modl-valid", "SKIP", "dot-only case")
+    try:
+        js_res = _run_modl_repo_parser(modl)
+    except RuntimeError as e:
+        return CheckResult("modl-valid", "FAIL", str(e))
     if case.headers.get("code") == "parse":
-        return CheckResult("modl-valid", "SKIP", "intentional modl parse error case")
-    js_res = _run_modl_repo_parser(modl)
-    if js_res is not None:
-        errs = js_res.get("errors") or []
-        if errs:
-            return CheckResult("modl-valid", "FAIL", "; ".join(str(e) for e in errs))
+        # gripeline must only reject what modl itself reports as an error.
+        if js_res is None:
+            return CheckResult("modl-valid", "SKIP", "intentional modl parse error case")
+        if not js_res["errors"]:
+            return CheckResult("modl-valid", "FAIL",
+                               "case expects a modl parse error, but modl parses it cleanly")
+        return CheckResult("modl-valid", "PASS", "modl reports: " + "; ".join(js_res["errors"]))
+    if js_res is not None and js_res["errors"]:
+        return CheckResult("modl-valid", "FAIL", "; ".join(str(e) for e in js_res["errors"]))
     try:
         gl_mod.parse_modl(modl)
     except gl_mod.GripError as e:
         return CheckResult("modl-valid", "FAIL", str(e))
-    return CheckResult("modl-valid", "PASS")
+    if js_res is None:
+        return CheckResult("modl-valid", "PASS", "(gripeline parser only; set MODL_REPO for parity)")
+    diffs = modl_parity_diffs(modl, js_res)
+    if diffs:
+        return CheckResult("modl-valid", "FAIL", "\n".join(diffs))
+    return CheckResult("modl-valid", "PASS", "matches modl's parser")
 
 
 def check_lint(case: Case) -> CheckResult:

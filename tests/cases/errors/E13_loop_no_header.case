@@ -1,0 +1,14 @@
+name: E13-loop-no-header
+spec: 9
+expect: error
+code: E13
+=== dot ===
+digraph {
+  subgraph cluster_x { gl_role=for; a[shape=box label="echo hi"] }
+}
+=== modl ===
+#gl begin x role=for
+a square echo hi
+#gl end
+=== error ===
+no loop header

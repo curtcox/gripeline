@@ -26,6 +26,13 @@ GRIPELINE=./gripeline            python3 tests/run.py
 GRIPELINE='python3 gripeline.py' python3 tests/run.py
 ```
 
+Point `MODL_REPO` at a `curtcox/modl` checkout (needs `node`) to also check
+that gripeline parses every `=== modl ===` source exactly as modl does:
+
+```bash
+MODL_REPO=../modl GRIPELINE='python3 gripeline.py' python3 tests/run.py
+```
+
 The harness invokes `$GRIPELINE <subcmd> <file.dot|file.modl>`, where `<subcmd>`
 defaults to `build` (override via `GRIPELINE_SUBCMD`; set it empty to omit).
 `build` must print the transpiled bash to stdout, run the §9 static check first,
@@ -40,7 +47,7 @@ fixtures themselves are always checked.
 | check            | when it runs                         | what it verifies |
 |------------------|--------------------------------------|------------------|
 | `dot-valid`      | when `=== dot ===` is present        | `=== dot ===` parses with Graphviz (`dot -Tcanon`); falls back to a brace check if `dot` is absent |
-| `modl-valid`     | when `=== modl ===` is present       | `=== modl ===` parses with modl (`$MODL_REPO` if set, else gripeline's modl parser) |
+| `modl-valid`     | when `=== modl ===` is present       | `=== modl ===` parses with modl; with `$MODL_REPO` (a `curtcox/modl` checkout) and `node`, gripeline's parse must also match modl's own parser — same nodes, shapes, text and edges ([`modl_parse.cjs`](modl_parse.cjs)). Without it, only gripeline's parser runs. For `code: parse` cases, modl must report an error too |
 | `lint`           | exact-bash cases                     | the `=== bash ===` expectation is itself valid bash (`bash -n`) |
 | `transpile`      | when `GRIPELINE` is set              | transpiler output matches the expectation (see modes below) |
 | `modl-transpile` | twin cases (`dot` + `modl`)          | `.modl` source transpiles to the same expected bash/error as `.dot` |

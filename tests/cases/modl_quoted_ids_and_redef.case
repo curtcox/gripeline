@@ -3,7 +3,7 @@ mapping: typed
 spec: 14
 expect: bash
 === modl ===
-background white
+white                                  # a lone color word is the background
 "first step" square echo start
 "first step" big blue                  # redefinition keeps shape and text
 "second step" circle wc -c

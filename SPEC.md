@@ -609,6 +609,7 @@ itself*.
 | E10  | every `#gl` pragma in `modl` has known keys, valid values/ports, balanced blocks, and non-conflicting group ids | "unknown pragma key / invalid port / unbalanced `#gl begin`" |
 | E11  | every `dashed` control edge in `modl` (Commands/Typed) has text `&&`, `\|\|`, `;`, or empty | "dashed edge has invalid control text (expected `&&`, `\|\|`, or `;`)" |
 | E12  | every shell variable or function name is a valid shell identifier (`[A-Za-z_][A-Za-z0-9_]*`) | "variable/function name `my-var` is not a valid shell identifier" |
+| E13  | every loop has a header (`gl_loop` / `loop=`), and every loop, subshell, group and function has at least one member | "loop `x` has no loop header" / "loop `each` has an empty body" |
 
 **Output contract for a non-executable graph:**
 
@@ -1201,8 +1202,11 @@ changes to modl's own grammar.
 
   An explicit `#gl role=…` pragma always wins. Leaving `circle` and `none`
   neutral means an unstyled diagram (`a -> b -> c`) is a plain Commands pipe.
-  Size (`small`, `medium`, `big`), color, URL, and `background` lines never
-  affect execution.
+  Size (`tiny` … `huge`), color, URL, and background lines (a line holding only
+  a color word) never affect execution. modl fills a line's attribute slots
+  strictly in order — size, shape (edges: line style), color, URL, then text —
+  so a keyword out of that order is text, in the picture *and* in the command;
+  `gripeline` warns when text starts with such a keyword.
 
 - **D3. Line style → edge kind (`modl` only).**
   - `solid` (default), `bold`, `dotted` → data edge (pipe or redirect, decided
@@ -1250,6 +1254,9 @@ values are reported as **E10**.
    - `#gl mapping=commands|dataflow|typed`, `#gl prologue="…"`, `#gl shell=bash`
      set graph attributes.
    - `#gl node ID key=val…` sets attributes on node `ID` without restyling it.
+     `ID` must also appear on a modl line (node line or edge endpoint);
+     otherwise modl would never draw it, so it is an error (**E10**). The
+     pragma does not count as a mention for block membership.
    - Whole-line `#gl edge …` is not allowed (**E10**); use a trailing pragma on
      the edge line.
 
@@ -1259,6 +1266,12 @@ values are reported as **E10**.
      `loop=…`, and member defaults `default.role=…` and `default.edge=…`.
    - A node belongs to the innermost block where it is *first mentioned* (node
      line or edge endpoint); lines outside the block can still visually style it.
+   - An edge belongs to the innermost scope that holds both of its endpoints,
+     not to the block it is written in: `build -> push dashed &&` written after
+     `#gl end` still joins `build` and `push` inside the loop. An edge from
+     outside into a member addresses the member's enclosing group (e.g. a
+     value `ver -> build` orders `ver` before the loop). The same holds for
+     dot clusters.
    - Using `ID` as an edge endpoint addresses the group itself (e.g.
      `each -> tee` pipes the loop's stdout into `tee`). In `modl`, `ID` can also
      be styled as a visible stand-in node (e.g. `each big diamond for each svc`),
@@ -1269,10 +1282,19 @@ values are reported as **E10**.
 Running with `--annotate` on a non-executable `.modl` file writes
 `<name>.annotated.modl`: offending nodes get an appended `ID red` redefinition
 line, offending edge lines have `red` placed in their color slot, and each
-diagnostic is appended as a `# [Exx] …` comment so the file opens in the modl
+diagnostic is appended as a `# [Exx] …` comment (`red` goes after any size and
+line style, so modl still reads the edge's slots in order) so the file opens in the modl
 editor with offending elements highlighted in red.
 
 `gripeline` also emits non-fatal lint warnings on `stderr` for `modl` traps:
-a non-dashed edge whose text is `&&` or `||`, an unquoted `/path` swallowed by
-modl's URL slot (e.g. `/usr/bin/wc -l`), and visible labels over 22 characters
-(which the modl renderer truncates on screen).
+a non-dashed edge whose text is `&&` or `||` (in `dataflow`, where that text
+would run as a command), a `dashed` edge in `dataflow` without `#gl edge=…`
+(it is a data edge there), text that starts with an attribute keyword out of
+modl's slot order (e.g. `a red square …` makes `square` text), an unquoted
+`/path` swallowed by modl's URL slot (e.g. `/usr/bin/wc -l`), and labels longer
+than modl shows (22 characters for nodes, 28 for edges).
+
+The `tests/` harness checks the modl front end against modl itself: with
+`MODL_REPO` pointing at a `curtcox/modl` checkout, `tests/modl_parse.cjs` runs
+modl's own `parseSource` and every fixture must parse to the same nodes,
+shapes, text and edges in both.

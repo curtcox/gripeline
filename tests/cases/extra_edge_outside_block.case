@@ -1,0 +1,23 @@
+name: extra-edge-outside-block
+mapping: typed
+spec: 6.2
+expect: bash
+=== dot ===
+digraph {
+  subgraph cluster_each {
+    gl_loop="for s in a b"
+    build[shape=box label="echo build $s"]
+    push[shape=box label="echo push $s"]
+  }
+  build -> push [gl_edge=and]
+}
+=== modl ===
+#gl begin each loop="for s in a b"
+build square echo build $s
+push  square echo push $s
+#gl end
+build -> push dashed &&                # written outside the block, still inside the loop
+=== bash ===
+for s in a b; do
+echo build $s && echo push $s
+done

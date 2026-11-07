@@ -1,0 +1,17 @@
+name: modl-lexing-quotes-and-comments
+mapping: commands
+spec: 14
+expect: bash
+runnable: true
+=== modl ===
+#gl mapping=commands
+# modl's lexer: single-quoted strings are strings too, so " #" and "->"
+# inside them are text, not a comment or an arrow.
+e square printf 'a #x\nb->c\n'
+s square sed 's/ #.*//'
+g square grep -e '->'
+e -> s -> g
+=== bash ===
+printf 'a #x\nb->c\n' | sed 's/ #.*//' | grep -e '->'
+=== stdout ===
+b->c

@@ -38,11 +38,6 @@ jobs:
       - name: Install Graphviz
         run: sudo apt-get update && sudo apt-get install -y graphviz
 
-      - name: Run conformance tests
-        # Informational: prints the pass/fail table to the build log. The site
-        # build re-runs the checks itself, so this does not gate the deploy.
-        run: MODL_REPO="${GITHUB_WORKSPACE}/.modl-repo" GRIPELINE='python3 gripeline.py' python3 tests/run.py || true
-
       - name: Build site
         run: MODL_REPO="${GITHUB_WORKSPACE}/.modl-repo" python3 site/build.py site/_site
 
@@ -50,6 +45,35 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: site/_site
+
+  # Conformance tests, including the modl parity check (gripeline's modl
+  # parser vs. modl's own, via tests/modl_parse.cjs). Separate from `build` so
+  # a failure turns the run red without blocking the deploy: the published
+  # site shows the failing results.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout curtcox/modl for parser cross-check
+        uses: actions/checkout@v4
+        with:
+          repository: curtcox/modl
+          path: .modl-repo
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Graphviz
+        run: sudo apt-get update && sudo apt-get install -y graphviz
+
+      - name: Run conformance tests
+        run: MODL_REPO="${GITHUB_WORKSPACE}/.modl-repo" GRIPELINE='python3 gripeline.py' python3 tests/run.py
 
   deploy:
     needs: build

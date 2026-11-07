@@ -1,0 +1,21 @@
+name: extra-dataflow-sink-program
+mapping: dataflow
+spec: 4.2
+expect: bash
+runnable: true
+=== dot ===
+digraph { gl_mapping=dataflow
+  a[shape=box label="printf 'b\na\n'"]
+  b[shape=box label="tr a-z A-Z"]
+  a -> b [label="sort"]
+}
+=== modl ===
+#gl mapping=dataflow
+a square printf 'b\na\n'
+b square tr a-z A-Z                    # a program with inputs reads them on stdin
+a -> b sort
+=== bash ===
+printf 'b\na\n' | sort | tr a-z A-Z
+=== stdout ===
+A
+B

@@ -1,0 +1,9 @@
+name: E10-ghost-node
+spec: 9
+expect: error
+code: E10
+=== modl ===
+a square echo hi
+#gl node typo name=x                   # names a node modl never draws
+=== error ===
+not in the diagram

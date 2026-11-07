@@ -148,14 +148,17 @@ class Cluster:
 
 RESERVED_SHAPE = {"box": "program", "note": "file", "cds": "stream"}
 
-MODL_SHAPES = {"circle", "square", "diamond", "triangle", "hex", "none"}
-MODL_SIZES = {"small", "medium", "big"}
+# modl vocabulary — must match modl's js/editor.js (NODE_SIZES, NODE_SHAPES,
+# EDGE_STYLES, COLORS) exactly; tests/run.py cross-checks against it.
+MODL_SHAPES = {"none", "circle", "square", "diamond", "triangle", "hex"}
+MODL_SIZES = {"tiny", "small", "normal", "big", "bigger", "huge"}
 MODL_LINE_STYLES = {"solid", "dashed", "dotted", "bold"}
 MODL_COLORS = {
-    "red", "orange", "yellow", "green", "blue", "purple", "pink",
-    "brown", "gray", "grey", "black", "white", "cyan", "teal",
-    "magenta", "lime", "indigo", "violet",
+    "gray", "black", "white", "red", "orange", "yellow",
+    "green", "teal", "blue", "purple", "pink", "brown",
 }
+MODL_NODE_LABEL_MAX = 22
+MODL_EDGE_LABEL_MAX = 28
 MODL_ROLE_SHAPES = {
     "square": "program",
     "hex": "file",
@@ -179,7 +182,7 @@ VALID_MAPPINGS = {"commands", "dataflow", "typed"}
 VALID_SHELLS = {"bash"}
 
 _VALID_SHELL_ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-_VALID_MODL_ID = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.:-]*$")
+_VALID_MODL_ID = re.compile(r"^[A-Za-z0-9_:\-]+$")  # modl's isValidId
 
 
 @dataclass
@@ -419,94 +422,136 @@ def parse_dot(src: str) -> Model:
 # ==========================================================================
 # Parser (modl front end)
 # ==========================================================================
+# JavaScript's /\s/ (modl lexes with it), so whitespace splits exactly as modl does.
+_JS_WS = frozenset(
+    "\t\n\v\f\r       　﻿"
+    + "".join(chr(c) for c in range(0x2000, 0x200B))
+)
+
+
 @dataclass
-class ModlWord:
-    raw: str
-    val: str
-    quoted: bool
+class ModlPiece:
+    """One lexed piece of a modl line: ws | arrow | comment | word.
+
+    `start`/`end` are column offsets into the line. For a word, `val` is
+    modl's value (quotes of each string removed) and `quoted` says whether any
+    string was part of it. For a comment, `val` is the text after `#`.
+    """
+    kind: str
     start: int
     end: int
+    val: str = ""
+    quoted: bool = False
+
+
+def _lex_modl_line(line: str) -> list[ModlPiece]:
+    """A line-for-line port of modl's lexLine (js/editor.js).
+
+    A quote (" or ') opens a string only at the start of a word or right after
+    a closing quote, and only if the same quote character closes it later on
+    the line; otherwise it is an ordinary character. Inside a string, `->`,
+    `#` and whitespace are text. A `#` at column 0 or after whitespace starts
+    a comment; `->` outside strings is always an arrow, even mid-word.
+    """
+    pieces: list[ModlPiece] = []
+    i, n = 0, len(line)
+    while i < n:
+        c = line[i]
+        if c in _JS_WS:
+            j = i
+            while j < n and line[j] in _JS_WS:
+                j += 1
+            pieces.append(ModlPiece("ws", i, j))
+            i = j
+        elif c == "#" and (i == 0 or line[i - 1] in _JS_WS):
+            pieces.append(ModlPiece("comment", i, n, line[i + 1:]))
+            break
+        elif line.startswith("->", i):
+            pieces.append(ModlPiece("arrow", i, i + 2))
+            i += 2
+        else:
+            start = i
+            val: list[str] = []
+            quoted = False
+            can_open = True
+            while i < n and line[i] not in _JS_WS and not line.startswith("->", i):
+                q = line[i]
+                close = line.find(q, i + 1) if (can_open and q in "\"'") else -1
+                if close >= 0:
+                    val.append(line[i + 1:close])
+                    quoted = True
+                    i = close + 1
+                else:
+                    val.append(q)
+                    can_open = False
+                    i += 1
+            pieces.append(ModlPiece("word", start, i, "".join(val), quoted))
+    return pieces
 
 
 def _split_modl_comment(line: str) -> tuple[str, str | None, int]:
-    """Return (code_part, comment_body_or_None, comment_col).
-
-    In modl, a '#' at index 0 or preceded by whitespace outside double quotes
-    starts a comment to the end of the line.
-    """
-    in_quote = False
-    for i, c in enumerate(line):
-        if c == '"':
-            in_quote = not in_quote
-        elif c == "#" and not in_quote and (i == 0 or line[i - 1] in " \t"):
-            return line[:i], line[i + 1:], i
+    """Return (code_part, comment_body_or_None, comment_col) using modl's lexer."""
+    for p in _lex_modl_line(line):
+        if p.kind == "comment":
+            return line[:p.start], p.val, p.start
     return line, None, len(line)
 
 
-def _split_modl_arrows(code: str) -> list[tuple[int, int]] | None:
-    """Split `code` on `->` outside double quotes.
+def _looks_like_modl_url(tok: str | None) -> bool:
+    return bool(tok) and tok.startswith(("/", "http://", "https://", "mailto:", "www."))
 
-    Returns a list of (start, end) spans if at least one `->` is present,
-    or None if the line has no `->` outside quotes.
-    """
-    spans: list[tuple[int, int]] = []
-    in_quote = False
-    seg_start = 0
+
+@dataclass
+class ModlAttrs:
+    """Result of modl's parseAttrs: indices into the attribute word list."""
+    size: int | None = None
+    style: int | None = None   # node shape or edge line style
+    color: int | None = None
+    url: int | None = None
+    text: int | None = None    # index of the first text word, if text was given
+
+
+def _modl_parse_attrs(words: list[ModlPiece], kind: str) -> ModlAttrs:
+    """A port of modl's parseAttrs: slots are matched strictly in the order
+    size, shape|line-style, color, url, then the rest is text. Quoted words
+    never fill a slot."""
+    toks = [None if w.quoted else w.val for w in words]
+
+    def tok(k):
+        return toks[k] if k < len(toks) else None
+
+    a = ModlAttrs()
     i = 0
-    n = len(code)
-    found = False
-    while i < n:
-        c = code[i]
-        if c == '"':
-            in_quote = not in_quote
+    if tok(i):
+        if tok(i) in MODL_SIZES:
+            a.size = i
             i += 1
-        elif not in_quote and c == "-" and i + 1 < n and code[i + 1] == ">":
-            found = True
-            spans.append((seg_start, i))
-            seg_start = i + 2
-            i += 2
-        else:
+        styles = MODL_SHAPES if kind == "node" else MODL_LINE_STYLES
+        if tok(i) and tok(i) in styles:
+            a.style = i
             i += 1
-    if not found:
-        return None
-    spans.append((seg_start, n))
-    return spans
+    if tok(i) and tok(i) in MODL_COLORS:
+        a.color = i
+        i += 1
+    if _looks_like_modl_url(tok(i)):
+        a.url = i
+        i += 1
+    if i < len(words):
+        a.text = i
+    return a
 
 
-def _tokenize_modl_segment(seg: str) -> list[ModlWord]:
-    words: list[ModlWord] = []
-    i, n = 0, len(seg)
-    while i < n:
-        while i < n and seg[i] in " \t\r":
-            i += 1
-        if i >= n:
-            break
-        if seg[i] == '"':
-            start = i
-            j = i + 1
-            while j < n and seg[j] != '"':
-                j += 1
-            val = seg[i + 1 : j]
-            end = j + 1 if j < n else j
-            words.append(ModlWord(raw=seg[start:end], val=val, quoted=True,
-                                  start=start, end=end))
-            i = end
-        else:
-            start = i
-            j = i
-            while j < n and seg[j] not in ' \t\r"':
-                j += 1
-            val = seg[start:j]
-            words.append(ModlWord(raw=val, val=val, quoted=False,
-                                  start=start, end=j))
-            i = j
-    return words
+def _modl_text(line: str, words: list[ModlPiece], start: int) -> tuple[str, str]:
+    """Return (raw_text, display_text) for words[start:].
 
-
-def _is_modl_url(w: ModlWord) -> bool:
-    if w.quoted:
-        return False
-    return w.val.startswith(("/", "http://", "https://", "www.", "mailto:"))
+    raw_text is the exact source slice (D1); display_text is what modl shows
+    (word values joined with single spaces). Text whose display is blank
+    (``""``, ``''``) is the empty label.
+    """
+    display = " ".join(w.val for w in words[start:])
+    if display.strip() == "":
+        return "", display
+    return line[words[start].start:words[-1].end], display
 
 
 def _parse_pragma_tokens(body: str, lineno: int) -> list[str]:
@@ -606,6 +651,11 @@ class ModlParser:
         ]
         self._explicit_role_nodes: set[str] = set()
         self._standin_text: dict[str, str] = {}
+        # nodes so far named only by `#gl node ID` (modl never draws them)
+        self._pragma_only: set[str] = set()
+        # lints whose verdict depends on the final mapping: (lineno, kind, msg)
+        self._deferred_lints: list[tuple[int, str, str]] = []
+        self._lints: list[tuple[int, str]] = []
 
     def nextorder(self) -> int:
         self.order += 1
@@ -618,26 +668,42 @@ class ModlParser:
     def add_e10(self, msg: str):
         self.problems.append(("E10", f"[E10] {msg}"))
 
-    def validate_id(self, w: ModlWord, lineno: int) -> str:
+    def validate_id(self, w: ModlPiece, lineno: int) -> str:
+        # modl's idError: quoted ids may hold anything but nothing; the id is
+        # the word's value exactly (no whitespace normalization).
         if w.quoted:
-            nid = re.sub(r"\s+", " ", w.val.strip())
-            if nid == "":
+            if w.val == "":
                 raise GripError(f"Line {lineno}: empty node id")
-            return nid
-        nid = w.val
-        if not _VALID_MODL_ID.match(nid):
-            raise GripError(f'Line {lineno}: invalid node id "{nid}"')
-        return nid
+            return w.val
+        if not _VALID_MODL_ID.match(w.val):
+            raise GripError(f'Line {lineno}: invalid node id "{w.val}"')
+        return w.val
 
-    def ensure_node(self, nid: str, lineno: int) -> Node | None:
+    def ensure_node(self, nid: str, lineno: int, drawn: bool = True) -> Node | None:
+        """Get or create node `nid`.
+
+        `drawn` is False when the mention is a `#gl node` pragma, which modl
+        never sees. Such a node only joins a scope (and gets block defaults)
+        at its first drawn mention; one never drawn at all is an E10.
+        """
         if nid in self.clusters:
             return None
-        if nid not in self.nodes:
-            scope = self.current_scope
-            nd = Node(id=nid, attrs=dict(scope.node_def), cluster=scope.cluster,
+        nd = self.nodes.get(nid)
+        scope = self.current_scope
+        if nd is None:
+            nd = Node(id=nid, attrs=dict(scope.node_def) if drawn else {},
+                      cluster=scope.cluster if drawn else None,
                       order=self.nextorder(), pos=lineno)
             self.nodes[nid] = nd
-        return self.nodes[nid]
+            if not drawn:
+                self._pragma_only.add(nid)
+        elif drawn and nid in self._pragma_only:
+            self._pragma_only.discard(nid)
+            nd.attrs = {**scope.node_def, **nd.attrs}
+            nd.cluster = scope.cluster
+            nd.order = self.nextorder()
+            nd.pos = lineno
+        return nd
 
     def apply_node_pragmas(self, nd: Node | None, nid: str, pairs: list[tuple[str, str]], lineno: int):
         if nid in self.clusters:
@@ -752,6 +818,7 @@ class ModlParser:
                 self.add_e10(f'line {lineno}: group id "{cid}" cannot also have a node role')
             if cid in self.nodes:
                 nd = self.nodes.pop(cid)
+                self._pragma_only.discard(cid)
                 if "label" in nd.attrs:
                     self._standin_text[cid] = nd.attrs["label"]
 
@@ -810,7 +877,7 @@ class ModlParser:
             except ValueError as e:
                 self.add_e10(str(e))
                 return
-            nd = self.ensure_node(nid, lineno)
+            nd = self.ensure_node(nid, lineno, drawn=False)
             self.apply_node_pragmas(nd, nid, pairs, lineno)
             return
 
@@ -842,30 +909,58 @@ class ModlParser:
                 self.add_e10(f'line {lineno}: unknown graph pragma key "{k}"')
 
     def parse(self) -> Model:
-        for lineno, line in enumerate(self.src.splitlines(), start=1):
-            code, comment, comment_col = _split_modl_comment(line)
-            has_pragma = False
-            pragma_body = ""
-            if comment is not None and comment.startswith("gl") and (
-                len(comment) == 2 or comment[2] in " \t"
+        # modl splits on \r?\n only (not str.splitlines' wider set).
+        for lineno, line in enumerate(re.split(r"\r?\n", self.src), start=1):
+            pieces = _lex_modl_line(line)
+            comment = next((p for p in pieces if p.kind == "comment"), None)
+            pragma_body: str | None = None
+            if comment is not None and comment.val.startswith("gl") and (
+                len(comment.val) == 2 or comment.val[2] in " \t"
             ):
-                has_pragma = True
-                pragma_body = comment[2:]
+                pragma_body = comment.val[2:]
 
-            if code.strip() == "":
-                if has_pragma:
+            words = [p for p in pieces if p.kind == "word"]
+            has_arrow = any(p.kind == "arrow" for p in pieces)
+            if not words and not has_arrow:
+                if pragma_body is not None:
                     self.handle_whole_line_pragma(pragma_body, lineno)
                 continue
 
-            arrow_spans = _split_modl_arrows(code)
-            if arrow_spans is not None:
-                self._parse_edge_line(line, code, arrow_spans, has_pragma, pragma_body, comment_col, lineno)
+            # Background: exactly one unquoted color word and no arrow.
+            if not has_arrow and len(words) == 1 and not words[0].quoted \
+                    and words[0].val in MODL_COLORS:
+                if pragma_body is not None:
+                    self.add_e10(f"line {lineno}: #gl pragma on a background line (it has no element to attach to)")
+                continue
+
+            if has_arrow:
+                self._parse_edge_line(line, pieces, pragma_body, lineno)
             else:
-                self._parse_node_line(line, code, has_pragma, pragma_body, comment_col, lineno)
+                self._parse_node_line(line, words, pragma_body, lineno)
 
         if len(self.scope_stack) > 1:
             unclosed = self.scope_stack[-1].cluster
             self.add_e10(f'unbalanced #gl begin "{unclosed}" (missing #gl end)')
+
+        for nid in sorted(self._pragma_only, key=lambda x: self.nodes[x].order):
+            nd = self.nodes.pop(nid)
+            self.add_e10(f'line {nd.pos}: #gl node "{nid}" names a node that is not in the diagram')
+
+        dataflow = self.graph_attrs.get("gl_mapping", "typed") == "dataflow"
+        for lineno, kind, txt in self._deferred_lints:
+            if kind == "solid_control" and not dataflow:
+                self._lints.append((lineno,
+                    f'line {lineno}: warning: solid edge has text "{txt}" '
+                    f'(use "dashed {txt}" for control flow)'))
+            elif kind == "solid_control" and dataflow:
+                self._lints.append((lineno,
+                    f'line {lineno}: warning: edge text "{txt}" runs as a command in the dataflow '
+                    f'mapping (use #gl edge={"and" if txt == "&&" else "or"} for control flow)'))
+            elif kind == "dataflow_dashed" and dataflow:
+                self._lints.append((lineno,
+                    f"line {lineno}: warning: dashed edge is a data edge in the dataflow mapping "
+                    f"(add #gl edge=and|or|seq to make it control flow)"))
+        self.warnings.extend(msg for _ln, msg in sorted(self._lints, key=lambda t: t[0]))
 
         return Model(
             nodes=self.nodes,
@@ -881,77 +976,59 @@ class ModlParser:
             raw_lines=self.raw_lines,
         )
 
-    def _parse_node_line(self, line: str, code: str, has_pragma: bool,
-                         pragma_body: str, comment_col: int, lineno: int):
-        words = _tokenize_modl_segment(code)
-        if not words:
-            return
+    def _pragma_pairs(self, pragma_body: str | None, lineno: int) -> list[tuple[str, str]]:
+        if pragma_body is None:
+            return []
+        try:
+            ptoks = _parse_pragma_tokens(pragma_body, lineno)
+            if not ptoks:
+                self.add_e10(f"line {lineno}: empty #gl pragma")
+                return []
+            return _parse_kv_pairs(ptoks, lineno)
+        except ValueError as e:
+            self.add_e10(str(e))
+            return []
 
-        # Background directive: `background <color|none|url>` with no text and no pragma
-        if (
-            not has_pragma
-            and len(words) == 2
-            and not words[0].quoted
-            and words[0].val == "background"
-            and not words[1].quoted
-            and (words[1].val in MODL_COLORS or words[1].val == "none" or _is_modl_url(words[1]))
-        ):
+    def _slot_order_lint(self, words: list[ModlPiece], a: ModlAttrs, kind: str, lineno: int):
+        """Warn when text starts with an attribute keyword: modl fills slots
+        strictly in order (size, shape|style, color, url), so an out-of-order
+        keyword silently becomes text, both in the picture and in the command."""
+        if a.text is None or words[a.text].quoted:
             return
+        w = words[a.text].val
+        styles = MODL_SHAPES if kind == "node" else MODL_LINE_STYLES
+        if w in MODL_SIZES or w in styles or w in MODL_COLORS:
+            order = "size, shape, color, url" if kind == "node" else "size, line style, color, url"
+            self._lints.append((lineno,
+                f'line {lineno}: warning: "{w}" is out of modl\'s attribute order ({order}) '
+                f"and became {kind} text"))
 
+    def _url_lint(self, words: list[ModlPiece], a: ModlAttrs, what: str, lineno: int):
+        if a.url is not None and words[a.url].val.startswith("/"):
+            url = words[a.url].val
+            self._lints.append((lineno,
+                f'line {lineno}: warning: "{url}" filled the URL slot, not {what} (quote it to include it)'))
+
+    def _parse_node_line(self, line: str, words: list[ModlPiece],
+                         pragma_body: str | None, lineno: int):
         nid = self.validate_id(words[0], lineno)
-
-        # Greedy slot matching: size, color, shape, url
-        size = color = shape = url = None
-        idx = 1
-        while idx < len(words):
-            w = words[idx]
-            if w.quoted:
-                break
-            if size is None and w.val in MODL_SIZES:
-                size = w.val
-                idx += 1
-                continue
-            if color is None and w.val in MODL_COLORS:
-                color = w.val
-                idx += 1
-                continue
-            if shape is None and w.val in MODL_SHAPES:
-                shape = w.val
-                idx += 1
-                continue
-            if url is None and _is_modl_url(w):
-                url = w.val
-                idx += 1
-                continue
-            break
+        attr_words = words[1:]
+        a = _modl_parse_attrs(attr_words, "node")
+        shape = attr_words[a.style].val if a.style is not None else None
 
         raw_text: str | None = None
         display_text = ""
-        if idx < len(words):
-            raw_text = code[words[idx].start:].strip()
-            if raw_text == '""':
-                raw_text = ""
-            display_text = " ".join(re.sub(r"\s+", " ", w.val.strip()) for w in words[idx:]).strip()
+        if a.text is not None:
+            raw_text, display_text = _modl_text(line, attr_words, a.text)
 
-        if url and url.startswith("/"):
-            self.warnings.append(
-                f'line {lineno}: warning: "{url}" filled the URL slot, not command text (quote it to include in command)'
-            )
-        if len(display_text) > 22:
-            self.warnings.append(
-                f'line {lineno}: warning: node "{nid}" label is {len(display_text)} chars (> 22 chars truncated in modl)'
-            )
+        self._url_lint(attr_words, a, "command text", lineno)
+        self._slot_order_lint(attr_words, a, "node", lineno)
+        if len(display_text) > MODL_NODE_LABEL_MAX:
+            self._lints.append((lineno,
+                f'line {lineno}: warning: node "{nid}" label is {len(display_text)} chars '
+                f'(modl shows at most {MODL_NODE_LABEL_MAX})'))
 
-        pairs: list[tuple[str, str]] = []
-        if has_pragma:
-            try:
-                ptoks = _parse_pragma_tokens(pragma_body, lineno)
-                if not ptoks:
-                    self.add_e10(f"line {lineno}: empty #gl pragma")
-                else:
-                    pairs = _parse_kv_pairs(ptoks, lineno)
-            except ValueError as e:
-                self.add_e10(str(e))
+        pairs = self._pragma_pairs(pragma_body, lineno)
 
         if nid in self.clusters:
             if raw_text is not None:
@@ -975,61 +1052,40 @@ class ModlParser:
         if pairs:
             self.apply_node_pragmas(nd, nid, pairs, lineno)
 
-    def _parse_edge_line(self, line: str, code: str, spans: list[tuple[int, int]],
-                         has_pragma: bool, pragma_body: str, comment_col: int, lineno: int):
-        if len(spans) < 2:
+    def _parse_edge_line(self, line: str, pieces: list[ModlPiece],
+                         pragma_body: str | None, lineno: int):
+        segs: list[list[ModlPiece]] = [[]]
+        for p in pieces:
+            if p.kind == "arrow":
+                segs.append([])
+            elif p.kind == "word":
+                segs[-1].append(p)
+        # modl drops segments without words; fewer than two left is malformed.
+        non_empty = [s for s in segs if s]
+        if len(non_empty) < 2:
             raise GripError(f"Line {lineno}: malformed edge line")
 
-        seg_words: list[list[ModlWord]] = []
-        for s_start, s_end in spans:
-            seg = code[s_start:s_end]
-            if seg.strip() == "":
-                raise GripError(f"Line {lineno}: malformed edge line")
-            wlist = _tokenize_modl_segment(seg)
-            if not wlist:
-                raise GripError(f"Line {lineno}: malformed edge line")
-            seg_words.append(wlist)
-
-        endpoint_ids: list[str] = []
-        for wlist in seg_words:
-            endpoint_ids.append(self.validate_id(wlist[0], lineno))
-
-        # Parse trailing attributes and text from the LAST segment
-        last_start, last_end = spans[-1]
-        last_words = seg_words[-1]
-        style = color = url = None
-        color_span: tuple[int, int] | None = None
-        idx = 1
-        while idx < len(last_words):
-            w = last_words[idx]
-            if w.quoted:
-                break
-            if style is None and w.val in MODL_LINE_STYLES:
-                style = w.val
-                idx += 1
-                continue
-            if color is None and w.val in MODL_COLORS:
-                color = w.val
-                color_span = (last_start + w.start, last_start + w.end)
-                idx += 1
-                continue
-            if url is None and _is_modl_url(w):
-                url = w.val
-                idx += 1
-                continue
-            break
+        # Words after the id are attributes only in the last segment.
+        endpoint_ids = [self.validate_id(s[0], lineno) for s in non_empty]
+        last = non_empty[-1]
+        attr_words = last[1:]
+        a = _modl_parse_attrs(attr_words, "edge")
+        style = attr_words[a.style].val if a.style is not None else None
 
         raw_text: str | None = None
         display_text = ""
-        if idx < len(last_words):
-            raw_text = code[last_start + last_words[idx].start : last_end].strip()
-            if raw_text == '""':
-                raw_text = ""
-            display_text = " ".join(
-                re.sub(r"\s+", " ", w.val.strip()) for w in last_words[idx:]
-            ).strip()
+        if a.text is not None:
+            raw_text, display_text = _modl_text(line, attr_words, a.text)
 
-        color_insert_col = last_start + last_words[0].end
+        # For --annotate: where `red` goes so modl still reads the slots in
+        # order (size, style, color, ...): replace the color, or insert after
+        # the last of id/size/style.
+        if a.color is not None:
+            color_span = (attr_words[a.color].start, attr_words[a.color].end)
+        else:
+            color_span = None
+        anchor = a.style if a.style is not None else a.size
+        color_insert_col = attr_words[anchor].end if anchor is not None else last[0].end
         self.raw_lines[lineno] = {
             "kind": "edge",
             "color_span": color_span,
@@ -1039,34 +1095,21 @@ class ModlParser:
         pragma_attrs: dict = {}
         tail_port: str | None = None
         head_port: str | None = None
-        if has_pragma:
-            try:
-                ptoks = _parse_pragma_tokens(pragma_body, lineno)
-                if not ptoks:
-                    self.add_e10(f"line {lineno}: empty #gl pragma")
-                else:
-                    pairs = _parse_kv_pairs(ptoks, lineno)
-                    pragma_attrs, tail_port, head_port = self.parse_edge_pragmas(pairs, lineno)
-            except ValueError as e:
-                self.add_e10(str(e))
+        pairs = self._pragma_pairs(pragma_body, lineno)
+        if pairs:
+            pragma_attrs, tail_port, head_port = self.parse_edge_pragmas(pairs, lineno)
 
-        if url and url.startswith("/"):
-            self.warnings.append(
-                f'line {lineno}: warning: "{url}" filled the URL slot, not edge text (quote it to include in text)'
-            )
-        if len(display_text) > 22:
-            self.warnings.append(
-                f"line {lineno}: warning: edge label is {len(display_text)} chars (> 22 chars truncated in modl)"
-            )
-        if (
-            (style or "solid") != "dashed"
-            and "gl_edge" not in pragma_attrs
-            and raw_text in ("&&", "||")
-            and self.graph_attrs.get("gl_mapping", "typed") != "dataflow"
-        ):
-            self.warnings.append(
-                f'line {lineno}: warning: solid edge has text "{raw_text}" (use "dashed {raw_text}" for control flow)'
-            )
+        self._url_lint(attr_words, a, "edge text", lineno)
+        self._slot_order_lint(attr_words, a, "edge", lineno)
+        if len(display_text) > MODL_EDGE_LABEL_MAX:
+            self._lints.append((lineno,
+                f"line {lineno}: warning: edge label is {len(display_text)} chars "
+                f"(modl shows at most {MODL_EDGE_LABEL_MAX})"))
+        if "gl_edge" not in pragma_attrs:
+            if (style or "solid") != "dashed" and raw_text in ("&&", "||"):
+                self._deferred_lints.append((lineno, "solid_control", raw_text))
+            if style == "dashed":
+                self._deferred_lints.append((lineno, "dataflow_dashed", ""))
 
         for nid in endpoint_ids:
             self.ensure_node(nid, lineno)
@@ -1083,12 +1126,10 @@ class ModlParser:
         edge_attrs.update(pragma_attrs)
 
         for i in range(len(endpoint_ids) - 1):
-            tn = endpoint_ids[i]
-            hn = endpoint_ids[i + 1]
             e = Edge(
-                tail=tn,
+                tail=endpoint_ids[i],
                 tail_port=tail_port,
-                head=hn,
+                head=endpoint_ids[i + 1],
                 head_port=head_port,
                 attrs=dict(edge_attrs),
                 cluster=scope.cluster,
@@ -1387,6 +1428,33 @@ class Engine:
                         f'[E12] variable name "{vname}" is not a valid shell identifier'))
                     self.offending_nodes.add(nid)
 
+        # E13: a loop needs a header, and a loop/subshell/group/function needs
+        # a body (bash rejects `do done`, `( )`, `{ }`; `while :` would never end).
+        for cid, cl in sorted(self.clusters.items(), key=lambda kv: kv[1].order):
+            kind = self.cluster_kind(cid)
+            if kind == "transparent":
+                continue
+            loc = f"line {cl.pos}: " if self.model.lang == "modl" and cl.pos else ""
+            what = {"loop": "loop", "function": "function"}.get(kind, kind)
+            if kind == "loop" and not cl.attrs.get("gl_loop"):
+                self.problems.append(("E13",
+                    f'[E13] {loc}loop "{cid}" has no loop header (set loop="for x in ..." / gl_loop)'))
+                self.offending_nodes.add(cid)
+            has_body = any(
+                nd.role in self.UNIT_ROLES and self.effective_scope(nd.cluster) == cid
+                for nd in self.nodes.values()
+            ) or any(
+                self.cluster_kind(c.id) in self.UNIT_CLUSTER_KINDS
+                and self.effective_scope(c.parent) == cid
+                for c in self.clusters.values()
+            )
+            if not has_body:
+                hint = (" (in modl, a node belongs to the block where it is first mentioned)"
+                        if self.model.lang == "modl" else "")
+                self.problems.append(("E13",
+                    f'[E13] {loc}{what} "{cid}" has an empty body{hint}'))
+                self.offending_nodes.add(cid)
+
         return self.problems
 
     def cycle_declared(self, cyc):
@@ -1475,6 +1543,22 @@ class Engine:
                 new_nodes[nid] = pn
                 producers[nid] = pn
 
+        # consumer programs: a node explicitly given the program role (box /
+        # square / gl_role=program) that has inputs reads them on stdin and,
+        # like a producer, feeds its own out-edges. Without this a sink or
+        # middle program was mistaken for a wire and silently dropped.
+        consumers = {}
+        for nid, nd in old_nodes.items():
+            if nd.role == "program" and indeg.get(nid, 0) > 0:
+                pn = Node(id=nid, attrs={"label": self.optext(nd)}, role="program",
+                          order=nd.order, pos=nd.pos)
+                for k in ("gl_raw", "gl_async"):
+                    if k in nd.attrs:
+                        pn.attrs[k] = nd.attrs[k]
+                new_nodes[nid] = pn
+                producers[nid] = pn
+                consumers[nid] = pn
+
         # producer edge index for each wire (head -> list of edge indices)
         producer_of = {}
         for k, e in enumerate(old_edges):
@@ -1531,7 +1615,7 @@ class Engine:
             pid = edge_node_id[k]
             feed_tail(e, k, pid)
             y = e.head
-            if is_file(y):
+            if is_file(y) or y in consumers:
                 new_edges.append(Edge(tail=pid, tail_port=None, head=y,
                                       head_port=None, order=no(), pos=e.pos))
             # else: y is wire/output; consumers pull from pid via their tail wiring
@@ -1552,11 +1636,74 @@ class Engine:
             node.extra_suffix.append(fd)
 
     # ----- per-scope emission -----
+    # ----- edge scoping -----
+    UNIT_ROLES = ("program", "op", "value", "coproc", "stream")
+    UNIT_CLUSTER_KINDS = ("loop", "subshell", "group")
+    _NOT_A_UNIT = object()
+
+    def unit_home(self, name):
+        """The effective scope in which endpoint `name` is a unit, or
+        _NOT_A_UNIT for endpoints that are not units (files: they are paths,
+        usable from any scope)."""
+        if name in self.clusters:
+            return self.effective_scope(self.clusters[name].parent)
+        nd = self.nodes.get(name)
+        if nd is None or nd.role not in self.UNIT_ROLES:
+            return self._NOT_A_UNIT
+        return self.effective_scope(nd.cluster)
+
+    def _scope_chain(self, scope):
+        chain = []
+        while scope is not None:
+            chain.append(scope)
+            scope = self.effective_scope(self.clusters[scope].parent)
+        chain.append(None)
+        return chain
+
+    def edge_scope(self, e):
+        """The scope that emits edge `e`: the innermost scope holding both
+        endpoints, not the block the edge happened to be written in (an edge
+        written at top level between two loop members belongs to the loop)."""
+        ht, hh = self.unit_home(e.tail), self.unit_home(e.head)
+        if ht is self._NOT_A_UNIT and hh is self._NOT_A_UNIT:
+            return self.effective_scope(e.cluster)
+        if ht is self._NOT_A_UNIT:
+            return hh
+        if hh is self._NOT_A_UNIT:
+            return ht
+        inner = set(self._scope_chain(hh))
+        for sc in self._scope_chain(ht):
+            if sc in inner:
+                return sc
+        return None
+
+    def lift(self, name, scope_id):
+        """Map endpoint `name` to the unit that represents it in `scope_id`:
+        itself, or the enclosing loop/subshell/group that is a unit there."""
+        h = self.unit_home(name)
+        if h is self._NOT_A_UNIT or h == scope_id:
+            return name
+        cid = name if name in self.clusters else self.nodes[name].cluster
+        while cid is not None:
+            cl = self.clusters[cid]
+            if self.cluster_kind(cid) in self.UNIT_CLUSTER_KINDS \
+                    and self.effective_scope(cl.parent) == scope_id:
+                return cid
+            cid = cl.parent
+        return name
+
     def process_scope(self, scope_id):
         nodes = [nd for nd in self.nodes.values()
                  if self.effective_scope(nd.cluster) == scope_id]
-        edges = [e for e in self.edges
-                 if self.effective_scope(e.cluster) == scope_id]
+        edges = []
+        for e in self.edges:
+            if self.edge_scope(e) != scope_id:
+                continue
+            t, h = self.lift(e.tail, scope_id), self.lift(e.head, scope_id)
+            if (t, h) != (e.tail, e.head):
+                e = Edge(tail=t, tail_port=e.tail_port, head=h, head_port=e.head_port,
+                         attrs=e.attrs, cluster=e.cluster, order=e.order, pos=e.pos)
+            edges.append(e)
         child_clusters = [c for c in self.clusters.values()
                           if self.effective_scope(c.parent) == scope_id
                           and self.cluster_kind(c.id) in ("loop", "subshell", "group")]
@@ -1833,7 +1980,7 @@ class Engine:
         body_text = "\n".join(body)
         cl = self.clusters[cid]
         if kind == "loop":
-            header = cl.attrs.get("gl_loop", "while :")
+            header = cl.attrs["gl_loop"]  # E13 guarantees a header
             s = header + "; do\n" + body_text + "\ndone"
             if stdin_path:
                 s += f" < {stdin_path}"
@@ -1965,9 +2112,18 @@ def detect_lang(path: str | None, src: str, lang: str | None = None) -> str:
             return "modl"
         if ext in (".dot", ".gv"):
             return "dot"
+    # dot: [strict] (graph|digraph) [ID] "{". A modl node line such as
+    # `graph square echo hi` also starts with `graph`, so require the brace.
     toks = tokenize(src)
-    if toks and toks[0].kind == "ID" and toks[0].val in ("strict", "digraph", "graph"):
-        return "dot"
+    k = 0
+    if toks[k].kind == "ID" and toks[k].val == "strict":
+        k += 1
+    if toks[k].kind == "ID" and toks[k].val in ("digraph", "graph"):
+        k += 1
+        if toks[k].kind in ("ID", "STR"):
+            k += 1
+        if toks[k].kind == "{":
+            return "dot"
     return "modl"
 
 
@@ -2001,9 +2157,26 @@ def emit_diagnostics(path, problems, stream=sys.stderr):
 
 
 def _format_modl_id(nid: str) -> str:
+    """Write `nid` as a modl id word that lexes back to exactly `nid`."""
     if _VALID_MODL_ID.match(nid):
         return nid
-    return f'"{nid}"'
+    if '"' not in nid:
+        return f'"{nid}"'
+    if "'" not in nid:
+        return f"'{nid}'"
+    # Both quote kinds: adjacent strings form one word ("a'b" + 'c"d').
+    out, buf = [], ""
+    for ch in nid:
+        if ch == '"':
+            if buf:
+                out.append(f'"{buf}"')
+            out.append("'\"'")
+            buf = ""
+        else:
+            buf += ch
+    if buf:
+        out.append(f'"{buf}"')
+    return "".join(out)
 
 
 def annotate(engine: Engine, path: str, problems, out_path: str):
