@@ -402,13 +402,14 @@ class ReviewRegressions(unittest.TestCase):
     def test_review_link_keeps_failed_stdout_empty(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d)/'in.modl'
-            path.write_text('a hex in\nb hex out\na -> b\n')
+            original = 'a hex in\r\nb hex out\r\na -> b\r\n'
+            path.write_bytes(original.encode('utf-8'))
             code, out, err = run_cli('check', '--annotate', '--link', str(path))
             self.assertEqual(code, 65)
             self.assertEqual(out, '')
             link = next(line for line in err.splitlines() if line.startswith('https://'))
             self.assertIn('&mark=', link)
-            self.assertEqual(gl.decode_share_link(link), path.read_text())
+            self.assertEqual(gl.decode_share_link(link), original)
             self.assertFalse((Path(d)/'in.annotated.modl').exists())
 
     def test_annotation_line_endings(self):
