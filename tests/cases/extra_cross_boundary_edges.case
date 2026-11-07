@@ -1,0 +1,49 @@
+name: extra-cross-boundary-edges
+mapping: typed
+spec: 6.2
+expect: bash
+runnable: true
+=== dot ===
+digraph {
+  ver[gl_role=value]
+  src[shape=box label="echo v1"]
+  src -> ver
+  subgraph cluster_each {
+    gl_loop="for s in a b"
+    b[shape=box label="echo $ver $s"]
+  }
+  ver -> b
+  gen[shape=box label="seq 3"]
+  subgraph cluster_w {
+    gl_loop="while read x"
+    r[shape=box label="echo got $x"]
+  }
+  gen -> r
+}
+=== modl ===
+ver diamond
+src square echo v1
+src -> ver
+#gl begin each loop="for s in a b"
+b square echo $ver $s
+#gl end
+ver -> b                               # into a loop member: orders ver before the loop
+gen square seq 3
+#gl begin w loop="while read x"
+r square echo got $x
+#gl end
+gen -> r                               # into a loop member: pipes into the loop
+=== bash ===
+ver=$(echo v1)
+for s in a b; do
+echo $ver $s
+done
+seq 3 | while read x; do
+echo got $x
+done
+=== stdout ===
+v1 a
+v1 b
+got 1
+got 2
+got 3

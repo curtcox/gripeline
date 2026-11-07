@@ -6,6 +6,8 @@ that validates a gripeline transpiler against them.
 ```
 tests/
   run.py            # the harness
+  test_units.py     # unit tests: annotate, id quoting, sniffing, share links, modl parity corpus
+  modl_parse.cjs    # runs modl's own parser (from $MODL_REPO) for parity checks
   cases/            # one *.case file per example (success cases)
   cases/errors/     # one *.case file per §9 not-executable condition
   stubs/            # (optional) fake commands on PATH for `runnable` cases
@@ -31,6 +33,15 @@ that gripeline parses every `=== modl ===` source exactly as modl does:
 
 ```bash
 MODL_REPO=../modl GRIPELINE='python3 gripeline.py' python3 tests/run.py
+```
+
+Unit tests cover what fixtures can't: `--annotate` output, modl id quoting,
+language sniffing, share links, line splitting, edge scoping, and parity with
+modl's parser over modl's own examples (its gallery and docs snippets) plus a
+set of lexer edge cases. The parity tests are skipped without `MODL_REPO`:
+
+```bash
+MODL_REPO=../modl python3 tests/test_units.py
 ```
 
 The harness invokes `$GRIPELINE <subcmd> <file.dot|file.modl>`, where `<subcmd>`

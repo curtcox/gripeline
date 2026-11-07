@@ -1,0 +1,19 @@
+name: modl-lints
+mapping: typed
+spec: 14.3
+expect: bash
+=== modl ===
+a red square echo hi                   # "square" after the color is text
+b square /usr/bin/wc -l                # URL slot swallows the path
+c square echo abcdefghijklmnopqrstuvwxyz
+a -> b
+b -> c solid this edge label is far too long
+c -> d &&                              # solid edge with control text
+=== bash ===
+square echo hi | -l | echo abcdefghijklmnopqrstuvwxyz | d
+=== stderr ===
+"square" is out of modl's attribute order
+"/usr/bin/wc" filled the URL slot
+node "c" label is 31 chars
+edge label is 31 chars
+solid edge has text "&&"

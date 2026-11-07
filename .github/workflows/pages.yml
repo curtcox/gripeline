@@ -75,6 +75,9 @@ jobs:
       - name: Run conformance tests
         run: MODL_REPO="${GITHUB_WORKSPACE}/.modl-repo" GRIPELINE='python3 gripeline.py' python3 tests/run.py
 
+      - name: Run unit tests
+        run: MODL_REPO="${GITHUB_WORKSPACE}/.modl-repo" python3 tests/test_units.py
+
   deploy:
     needs: build
     runs-on: ubuntu-latest

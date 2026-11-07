@@ -1,0 +1,14 @@
+name: E13-empty-function
+spec: 9
+expect: error
+code: E13
+=== dot ===
+digraph {
+  subgraph cluster_f { gl_role=function; gl_name=f; log[shape=note label="x.log"] }
+}
+=== modl ===
+#gl begin f role=function
+log hex x.log                          # a file alone is not a body
+#gl end
+=== error ===
+empty body

@@ -1,0 +1,9 @@
+name: E10-pragma-on-background
+spec: 9
+expect: error
+code: E10
+=== modl ===
+red                                    #gl role=file
+a square echo hi
+=== error ===
+background line

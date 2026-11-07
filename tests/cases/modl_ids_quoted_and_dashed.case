@@ -1,0 +1,11 @@
+name: modl-ids-quoted-and-dashed
+mapping: typed
+spec: 14
+expect: bash
+=== modl ===
+"a  b" square echo x                   # quoted id keeps its inner whitespace
+-x     square wc -c                    # modl ids may start with "-"
+#gl node "a  b" async=false
+"a  b" -> -x
+=== bash ===
+echo x | wc -c

@@ -1,0 +1,13 @@
+name: modl-pragma-node-membership
+mapping: typed
+spec: 14
+expect: bash
+=== modl ===
+#gl node p raw="echo raw $s"           # a pragma is not a mention for membership...
+#gl begin each loop="for s in a b"
+p square                               # ...so p joins the loop where it is drawn
+#gl end
+=== bash ===
+for s in a b; do
+echo raw $s
+done

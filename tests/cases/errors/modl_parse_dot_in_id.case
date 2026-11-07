@@ -1,0 +1,9 @@
+name: modl-parse-dot-in-id
+spec: 14
+expect: error
+code: parse
+=== modl ===
+ok -> fine
+not.ok square
+=== error ===
+invalid node id "not.ok"

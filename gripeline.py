@@ -2149,7 +2149,8 @@ def build_engine(path: str, lang: str | None = None) -> Engine:
     return Engine(model)
 
 
-def emit_diagnostics(path, problems, stream=sys.stderr):
+def emit_diagnostics(path, problems, stream=None):
+    stream = stream or sys.stderr  # resolved per call, so redirection works
     print(f"gripeline: {path} not executable ({len(problems)} problems)", file=stream)
     for code, msg in problems:
         print(f"  - {msg}", file=stream)

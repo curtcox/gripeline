@@ -1,0 +1,8 @@
+name: E02-modl-empty-single-quotes
+spec: 9
+expect: error
+code: E02
+=== modl ===
+a square ''                            # '' is modl's empty text, like ""
+=== error ===
+has no operation

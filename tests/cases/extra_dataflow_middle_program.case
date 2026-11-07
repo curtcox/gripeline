@@ -1,0 +1,21 @@
+name: extra-dataflow-middle-program
+mapping: dataflow
+spec: 4.2
+expect: bash
+=== dot ===
+digraph { gl_mapping=dataflow
+  a[shape=box label="echo a"]
+  b[shape=box label="tr a-z A-Z"]
+  f[shape=note label="out.txt"]
+  a -> b [label="sort"]
+  b -> f [label="uniq"]
+}
+=== modl ===
+#gl mapping=dataflow
+a square echo a
+b square tr a-z A-Z                    # has inputs and outputs: a middle stage
+f hex out.txt
+a -> b sort
+b -> f uniq
+=== bash ===
+echo a | sort | tr a-z A-Z | uniq > out.txt

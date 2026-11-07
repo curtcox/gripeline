@@ -1,0 +1,16 @@
+name: modl-dataflow-lints
+mapping: dataflow
+spec: 14.3
+expect: contains
+=== modl ===
+in  hex in.txt
+mid triangle
+out hex out.txt
+in -> mid dashed sort                  # dashed is still a data edge in dataflow
+mid -> out &&
+#gl mapping=dataflow                   # set last: the lints use the final mapping
+=== bash ===
+sort < in.txt
+=== stderr ===
+dashed edge is a data edge in the dataflow mapping
+edge text "&&" runs as a command in the dataflow mapping

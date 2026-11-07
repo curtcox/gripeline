@@ -1,0 +1,19 @@
+name: E03-dataflow-program-fanin
+spec: 9
+expect: error
+code: E03
+=== dot ===
+digraph { gl_mapping=dataflow
+  a[shape=box label="echo a"] c[shape=box label="echo c"] b[shape=box label="cat"]
+  a -> b [label="sort"]
+  c -> b [label="uniq"]
+}
+=== modl ===
+#gl mapping=dataflow
+a square echo a
+c square echo c
+b square cat
+a -> b sort
+c -> b uniq
+=== error ===
+has 2 inputs
