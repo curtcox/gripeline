@@ -1,6 +1,6 @@
 # Plan: modl as a second gripeline source language
 
-**Status:** design decided (D1–D5), implementation not started. **Date:** 2026-11-07.
+**Status:** implemented (Phases 0–3). **Date:** 2026-11-07.
 
 Goal: `gripeline build|run|check foo.modl` works the way it does for `foo.dot`.
 The same `.modl` file still opens and renders unchanged in the

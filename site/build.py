@@ -5,11 +5,13 @@ Builds, into an output directory (default: ``site/_site``):
 
   index.html        landing page
   spec.html         SPEC.md rendered to HTML, with every ```dot``` block shown
-                    as source *and* a rendered SVG (via the `dot` CLI)
+                    as source *and* a rendered SVG (via the `dot` CLI) and every
+                    ```modl``` block shown with syntax highlighting and an
+                    "Open in modl editor" (#h1=) link
   tests.html        the conformance test index, with pass/fail per case
-  tests/<name>.html one page per test case: source dot, rendered SVG, the
-                    expected bash/error, the transpiler's actual output, and a
-                    per-check (dot-valid / lint / transpile / run) breakdown
+  tests/<name>.html one page per test case: source dot and/or modl, rendered
+                    diagram / editor link, expected bash/error, the transpiler's
+                    actual output, and a per-check breakdown
 
 The test results are produced by importing the conformance harness in
 ``tests/run.py`` and running its checks against the transpiler named by the
@@ -18,7 +20,7 @@ GRIPELINE environment variable (default: ``python3 <repo>/gripeline.py``).
 Usage:
     python3 site/build.py [output-dir]
 
-Requires the `dot` CLI (Graphviz) on PATH to render diagrams; without it the
+Requires the `dot` CLI (Graphviz) on PATH to render dot diagrams; without it the
 diagrams degrade to a "source only" note.
 """
 from __future__ import annotations
@@ -39,13 +41,15 @@ DOT_BIN = shutil.which("dot")
 # Point the harness at the bundled transpiler unless the caller overrides it.
 os.environ.setdefault("GRIPELINE", f"python3 {ROOT / 'gripeline.py'}")
 
-# Import the conformance harness so we reuse its parsing and checks verbatim.
+# Import gripeline and the conformance harness so we reuse their helpers verbatim.
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(TESTS_DIR))
+import gripeline as gl_mod  # noqa: E402
 import run as harness  # noqa: E402
 
 
 # ==========================================================================
-# Graphviz rendering
+# Graphviz & modl rendering
 # ==========================================================================
 # A block is already a full graph if it declares one anywhere (a leading
 # /* comment */ may precede the `digraph` keyword); otherwise it is a fragment
@@ -93,6 +97,41 @@ def diagram_block(src: str, *, with_source: bool = True) -> str:
                 else "this snippet did not render")
         parts.append(f'<div class="dot-render"><div class="note">{note}</div></div>')
     return f'<div class="diagram">{"".join(parts)}</div>'
+
+
+def highlight_modl_line(line: str) -> str:
+    """Syntax-highlight a single modl line (keywords, arrows, #gl pragmas, comments)."""
+    code, comment, _col = gl_mod._split_modl_comment(line)
+    # Highlight arrows and style/shape keywords in the code portion
+    escaped = html.escape(code)
+    escaped = escaped.replace("-&gt;", '<span class="modl-arrow">-&gt;</span>')
+    for kw in ("square", "hex", "triangle", "diamond", "circle", "none",
+               "solid", "dashed", "dotted", "bold", "small", "medium", "big",
+               "background"):
+        escaped = re.sub(rf"\b({kw})\b", r'<span class="modl-kw">\1</span>', escaped)
+    if comment is not None:
+        if comment.startswith("gl") and (len(comment) == 2 or comment[2] in " \t"):
+            c_html = f'<span class="modl-pragma">#{html.escape(comment)}</span>'
+        else:
+            c_html = f'<span class="modl-comment">#{html.escape(comment)}</span>'
+        return escaped + c_html
+    return escaped
+
+
+def modl_block(src: str) -> str:
+    """HTML for a modl snippet: highlighted source plus an 'Open in modl editor' link."""
+    url = gl_mod.encode_share_link(src)
+    highlighted = "\n".join(highlight_modl_line(l) for l in src.splitlines())
+    return (
+        '<div class="modl-block">'
+        '<div class="modl-header">'
+        '<span class="label">modl source</span>'
+        f'<a class="modl-open" href="{html.escape(url, quote=True)}" '
+        'target="_blank" rel="noopener">Open in modl editor &#8599;</a>'
+        "</div>"
+        f'<pre><code class="lang-modl">{highlighted}</code></pre>'
+        "</div>"
+    )
 
 
 # ==========================================================================
@@ -169,6 +208,8 @@ def render_markdown(md: str) -> str:
             code = "\n".join(body)
             if lang == "dot":
                 out.append(diagram_block(code))
+            elif lang == "modl":
+                out.append(modl_block(code))
             else:
                 cls = f' class="lang-{lang}"' if lang else ""
                 out.append(f"<pre><code{cls}>{html.escape(code)}</code></pre>")
@@ -270,7 +311,6 @@ _ITEM = re.compile(r"^(\s*)([-*+]|\d+\.)\s+(.*)$")
 
 def render_list(block: list[str]) -> str:
     """Render a (possibly nested) list block to HTML."""
-    # Determine the indent of the top level.
     base_indent = len(re.match(r"^(\s*)", block[0]).group(1))
     ordered = bool(re.match(r"^\s*\d+\.", block[0]))
     tag = "ol" if ordered else "ul"
@@ -284,23 +324,19 @@ def render_list(block: list[str]) -> str:
             continue
         indent = len(m.group(1))
         if indent > base_indent:
-            # belongs to a nested list handled by a previous item; skip
             k += 1
             continue
         text = m.group(3)
-        # gather child lines (deeper indent or continuation) for this item
         children: list[str] = []
         k += 1
         while k < len(block):
             mm = _ITEM.match(block[k])
-            cur_indent = len(re.match(r"^(\s*)", block[k]).group(1))
             if mm and len(mm.group(1)) <= base_indent:
                 break
             children.append(block[k])
             k += 1
         item_html = _list_item_html(text)
         if children:
-            # children may include a nested list and/or continuation text
             nested = [c for c in children if _ITEM.match(c)]
             if nested:
                 item_html += render_list(children)
@@ -345,9 +381,19 @@ hr { border:none; border-top:1px solid var(--border); margin:2rem 0; }
 .diagram { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin:1.2rem 0;
            align-items:start; }
 @media (max-width:720px){ .diagram { grid-template-columns:1fr; } }
-.diagram .label { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em;
-                  color:var(--muted); margin-bottom:.3rem; }
+.diagram .label, .modl-header .label { font-size:.72rem; text-transform:uppercase;
+                  letter-spacing:.05em; color:var(--muted); margin-bottom:.3rem; }
 .dot-source pre { margin:0; }
+.modl-block { margin:1.2rem 0; }
+.modl-header { display:flex; justify-content:space-between; align-items:center;
+               margin-bottom:.3rem; }
+.modl-open { font-size:.82rem; font-weight:600; text-decoration:none; }
+.modl-open:hover { text-decoration:underline; }
+.modl-block pre { margin:0; }
+.modl-arrow { color:#cf222e; font-weight:700; }
+.modl-kw { color:#8250df; font-weight:600; }
+.modl-pragma { color:#0969da; font-weight:600; }
+.modl-comment { color:var(--muted); font-style:italic; }
 .svg-wrap { border:1px solid var(--border); border-radius:8px; padding:1rem;
             background:#fff; overflow:auto; }
 .svg-wrap svg { max-width:100%; height:auto; display:block; }
@@ -407,44 +453,55 @@ def case_anchor(case) -> str:
     return re.sub(r"[^\w.-]", "_", case.name)
 
 
-def run_transpiler_clean(case):
-    """Invoke the transpiler like the harness does, but with a stable filename.
-
-    The harness writes the dot to a random temp file, so diagnostics echo a path
-    like ``/tmp/tmpXXXX.dot``. For published output we want a readable, stable
-    reference, so we use ``<name>.dot`` and scrub the directory from the
-    captured stdout/stderr. Returns a (rc, out, err) tuple shaped exactly like
-    ``harness.run_transpiler`` so the harness check functions can consume it.
-    """
+def run_transpiler_clean(case, lang: str = "dot"):
+    """Invoke the transpiler like the harness does, but with a stable filename."""
     if not harness.GRIPELINE:
         return None
     import shlex
     import tempfile
-    safe = re.sub(r"[^\w.-]", "_", case.name) + ".dot"
+    src = case.dot if lang == "dot" else case.modl
+    if not src.strip():
+        return None
+    ext = ".dot" if lang == "dot" else ".modl"
+    safe = re.sub(r"[^\w.-]", "_", case.name) + ext
     with tempfile.TemporaryDirectory() as d:
-        dotfile = os.path.join(d, safe)
-        with open(dotfile, "w") as f:
-            f.write(case.dot if case.dot.endswith("\n") else case.dot + "\n")
+        srcfile = os.path.join(d, safe)
+        with open(srcfile, "w") as f:
+            f.write(src if src.endswith("\n") else src + "\n")
         cmd = shlex.split(harness.GRIPELINE)
         if harness.GRIPELINE_SUBCMD:
             cmd.append(harness.GRIPELINE_SUBCMD)
-        cmd.append(dotfile)
+        cmd.append(srcfile)
         p = subprocess.run(cmd, capture_output=True, text=True)
-        out = p.stdout.replace(d + os.sep, "").replace(dotfile, safe)
-        err = p.stderr.replace(d + os.sep, "").replace(dotfile, safe)
+        out = p.stdout.replace(d + os.sep, "").replace(srcfile, safe)
+        err = p.stderr.replace(d + os.sep, "").replace(srcfile, safe)
         return p.returncode, out, err
 
 
 def run_case_checks(case):
-    """Run the harness checks for one case; return (result, checks list)."""
-    result = run_transpiler_clean(case)
-    checks = [
-        harness.check_dot_valid(case),
-        harness.check_lint(case),
-        harness.check_transpile(case, result),
-        harness.check_run(case, result),
-    ]
-    return result, checks
+    """Run the harness checks for one case; return (primary_result, checks list)."""
+    checks = []
+    primary_result = None
+    if case.has_dot:
+        dot_res = run_transpiler_clean(case, "dot")
+        primary_result = dot_res
+        checks.append(harness.check_dot_valid(case))
+        checks.append(harness.check_lint(case))
+        checks.append(harness.check_transpile(case, dot_res, "transpile"))
+        checks.append(harness.check_run(case, dot_res, "run"))
+        if case.has_modl:
+            modl_res = run_transpiler_clean(case, "modl")
+            checks.append(harness.check_modl_valid(case))
+            checks.append(harness.check_transpile(case, modl_res, "modl-transpile"))
+            checks.append(harness.check_run(case, modl_res, "modl-run"))
+    elif case.has_modl:
+        modl_res = run_transpiler_clean(case, "modl")
+        primary_result = modl_res
+        checks.append(harness.check_modl_valid(case))
+        checks.append(harness.check_lint(case))
+        checks.append(harness.check_transpile(case, modl_res, "transpile"))
+        checks.append(harness.check_run(case, modl_res, "run"))
+    return primary_result, checks
 
 
 def case_status(checks) -> str:
@@ -503,9 +560,12 @@ def build_test_pages(out_dir: Path) -> dict:
         body.append("<table><thead><tr><th>check</th><th>result</th></tr></thead>"
                      f"<tbody>{''.join(chk_rows)}</tbody></table>")
 
-        # the diagram
+        # the diagram(s)
         body.append("<h2>Diagram</h2>")
-        body.append(diagram_block(case.dot))
+        if case.has_dot:
+            body.append(diagram_block(case.dot))
+        if case.has_modl:
+            body.append(modl_block(case.modl))
 
         # expectation
         if case.expect == "error":
@@ -565,7 +625,7 @@ def build_test_pages(out_dir: Path) -> dict:
     body = [
         "<h1>Conformance test results</h1>",
         f"<p class='muted'>Transpiler under test: <code>{html.escape(os.environ.get('GRIPELINE',''))}</code>. "
-        "Each case is checked for dot-validity, bash lint (exact cases), transpile match, and (where applicable) runtime stdout.</p>",
+        "Each case is checked for dot/modl validity, bash lint (exact cases), transpile match (across both dot and modl twins), and (where applicable) runtime stdout.</p>",
         summary,
         "<table><thead><tr><th>case</th><th>mapping</th><th>expect</th><th>status</th><th>checks</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table>",
@@ -586,13 +646,13 @@ def build_spec_page(out_dir: Path) -> None:
 
 def build_index_page(out_dir: Path, stats: dict) -> None:
     readme = (ROOT / "README.md").read_text()
-    # Use the README intro but render through our markdown.
     body = [render_markdown(readme)]
     body.append("<hr>")
     body.append(
         "<p>This site publishes the "
-        "<a href='spec.html'>specification</a> with rendered Graphviz diagrams, "
-        "and the <a href='tests.html'>conformance test results</a> "
+        "<a href='spec.html'>specification</a> with rendered Graphviz diagrams "
+        "and interactive modl editor links, and the "
+        "<a href='tests.html'>conformance test results</a> "
         f"({stats['pass']} passed, {stats['fail']} failed, {stats['skip']} skipped "
         f"of {stats['cases']} cases).</p>"
     )

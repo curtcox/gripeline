@@ -2,10 +2,12 @@
 
 A graph *is* a pipeline.
 
-`gripeline` runs ordinary [Graphviz](https://graphviz.org) `dot` files as shell
-pipelines. The same file you hand to `dot -Tpng` to draw a picture, you hand to
-`gripeline` to run a `bash` pipeline — the diagram conveys data flow the way a
-`cmd1 | cmd2 | cmd3` one-liner does, only more clearly when it branches.
+`gripeline` runs ordinary [Graphviz](https://graphviz.org) `dot` files and
+[`modl`](https://modl.hashbin.page/) diagrams as shell pipelines. The same file
+you hand to `dot -Tpng` or open in the [modl editor](https://modl.hashbin.page/)
+to draw a picture, you hand to `gripeline` to run a `bash` pipeline — the
+diagram conveys data flow the way a `cmd1 | cmd2 | cmd3` one-liner does, only
+more clearly when it branches.
 
 ```dot
 digraph {                       // cat access.log | grep 404 | wc -l
@@ -14,21 +16,32 @@ digraph {                       // cat access.log | grep 404 | wc -l
 }
 ```
 
+```modl
+log hex    access.log           # grep 404 < access.log | wc -l
+g   square grep 404
+w   square wc -l
+log -> g -> w
+```
+
 - **[SPEC.md](SPEC.md)** — execution semantics: how nodes/edges map to
   programs, files, streams, and file descriptors; three mappings (Commands,
   Dataflow, Typed); control flow, variables, loops; what makes a diagram
-  renderable-but-not-executable; and a gallery of bash ⇄ dot examples.
-- **[tests/](tests/)** — a conformance harness and fixtures that validate a
-  transpiler (`python3 tests/run.py`). See [tests/README.md](tests/README.md).
+  renderable-but-not-executable; the `modl` front end and `#gl` comment pragmas
+  (§14); and a gallery of bash ⇄ dot ⇄ modl examples.
+- **[tests/](tests/)** — a conformance harness and fixtures (including dot/modl
+  twin cases) that validate a transpiler (`python3 tests/run.py`). See
+  [tests/README.md](tests/README.md).
 
-Status: design draft with a working transpiler. [`gripeline.py`](gripeline.py)
-(Python 3, standard library only) parses real `dot`, resolves roles, runs the
-§9 static check, and emits `bash`. Run it via the [`gripeline`](gripeline) shim:
+Status: working transpiler for both `dot` and `modl`.
+[`gripeline.py`](gripeline.py) (Python 3, standard library only) parses real
+`dot` and `modl`, resolves roles, runs the §9 static check, and emits identical
+`bash` from either front end. Run it via the [`gripeline`](gripeline) shim:
 
 ```bash
-./gripeline build foo.dot     # print transpiled bash to stdout
-./gripeline run   foo.dot     # transpile then exec under bash
-./gripeline check foo.dot     # §9 static check only (exit 0, or 65 if not executable)
+./gripeline build foo.dot     # or foo.modl — print transpiled bash to stdout
+./gripeline run   foo.modl    # transpile then exec under bash
+./gripeline check foo.modl    # §9 static check only (exit 0, or 65 if not executable)
+./gripeline run   'https://modl.hashbin.page/#h1=...'   # run a modl share link directly
 ```
 
 The conformance harness passes under either invocation form:
@@ -40,10 +53,11 @@ GRIPELINE='python3 gripeline.py' python3 tests/run.py
 
 ## Published site
 
-The [spec](SPEC.md) (with every Graphviz diagram rendered to SVG) and the
-conformance test results (a pass/fail index, plus a page per test showing the
-source dot, its rendered diagram, the expected bash, and the transpiler's
-actual output) are published to GitHub Pages at
+The [spec](SPEC.md) (with every Graphviz diagram rendered to SVG and every
+`modl` diagram linked to open in the [modl editor](https://modl.hashbin.page/))
+and the conformance test results (a pass/fail index, plus a page per test
+showing the source `dot` and `modl`, rendered diagrams, expected bash, and the
+transpiler's actual output) are published to GitHub Pages at
 <https://curtcox.github.io/gripeline/>.
 
 A push to `main` rebuilds and redeploys it via

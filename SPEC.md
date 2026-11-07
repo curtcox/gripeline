@@ -1,21 +1,22 @@
-# gripeline — a specification for executing Graphviz `dot` files as shell pipelines
+# gripeline — a specification for executing Graphviz `dot` and `modl` files as shell pipelines
 
-**Status:** Draft 0.3 (design exploration)
-**Source language:** unmodified Graphviz `dot`
+**Status:** Draft 0.4 (design exploration)
+**Source languages:** unmodified Graphviz `dot` and [`modl`](https://modl.hashbin.page/)
 **Execution model:** transpile to `bash`
 **Scope:** pipes, files, file-descriptor routing, fan-out/fan-in, sequencing &
 conditionals, subshells/functions, variables, command substitution, and loops.
 
-> A `gripeline` program is an ordinary Graphviz `dot` file. The same file you can
-> hand to `dot -Tpng` to draw a picture, you can hand to `gripeline` to run a
-> shell pipeline. This document defines what that file *means* when it is run.
+> A `gripeline` program is an ordinary Graphviz `dot` file or [`modl`](https://modl.hashbin.page/)
+> file. The same file you can hand to `dot -Tpng` or open in the modl editor to
+> draw a picture, you can hand to `gripeline` to run a shell pipeline. This
+> document defines what that file *means* when it is run.
 
 ---
 
 ## Table of contents
 
 1. [Goals and non-goals](#1-goals-and-non-goals)
-2. [How dot text becomes a program](#2-how-dot-text-becomes-a-program)
+2. [How source text becomes a program](#2-how-source-text-becomes-a-program)
 3. [The execution graph vs. the rendering attributes](#3-the-execution-graph-vs-the-rendering-attributes)
 4. [Three mappings (and how they relate)](#4-three-mappings)
    - [4.1 The Commands mapping](#41-the-commands-mapping--nodes-are-programs-edges-are-pipes)
@@ -31,6 +32,7 @@ conditionals, subshells/functions, variables, command substitution, and loops.
 11. [Conformance](#11-conformance)
 12. [Example gallery (bash ⇄ all three mappings)](#12-example-gallery)
 13. [Resolved decisions](#13-resolved-decisions)
+14. [modl source](#14-modl-source)
 
 ---
 
@@ -41,8 +43,9 @@ conditionals, subshells/functions, variables, command substitution, and loops.
 - Let a person *author a shell pipeline by drawing a graph*, where the picture
   conveys data flow at least as clearly as `cmd1 | cmd2 | cmd3` conveys it
   textually — and usually more clearly for anything that branches.
-- Keep the source 100% valid `dot`: it must render with stock Graphviz, and it
-  must run with `gripeline`, with no preprocessing.
+- Keep the source 100% valid `dot` or `modl`: it must render with stock Graphviz
+  or the [modl editor](https://modl.hashbin.page/), and it must run with
+  `gripeline`, with no preprocessing.
 - Make the common case trivial: a straight chain of arrows is a straight pipe.
 - Cover *as much of bash as can be expressed without hurting readability* — up to
   and including variables and loops — while letting a diagram opt to use only a
@@ -57,39 +60,46 @@ conditionals, subshells/functions, variables, command substitution, and loops.
 - Being a new general-purpose language. The semantics are defined *by
   translation to bash*. If you want to know exactly what a graph does, read the
   bash it transpiles to.
-- Layout. gripeline never positions nodes; that is Graphviz's job.
+- Layout. gripeline never positions nodes; that is Graphviz's or modl's job.
 
 ---
 
-## 2. How dot text becomes a program
+## 2. How source text becomes a program
+
+`gripeline` accepts **two source languages** — Graphviz `dot` (`.dot`, `.gv`)
+and [`modl`](https://modl.hashbin.page/) (`.modl`) — and translates both into
+the **same execution graph** (`Model`), so **both front ends emit identical bash
+for the same program**. Sections §§3–10 present the model using `dot` syntax;
+[§14](#14-modl-source) specifies how `modl` syntax and `#gl` comment pragmas map
+onto that same model.
 
 ```dot
 digraph how_dot_becomes_a_program {
     rankdir=LR;
     node [shape=box, fontname="monospace"];
 
-    src      [label="foo.dot\n(any dot)"];
-    ast      [label="dot AST"];
+    src      [label="foo.dot / foo.modl\n(any dot or modl)"];
+    ast      [label="front-end AST"];
     exec     [label="execution graph\n(nodes/edges/\nports/roles)"];
     bash     [label="bash script\n(the meaning)"];
     pic_src  [label="a picture", shape=note];
     pic_ast  [label="a picture", shape=note];
 
     src  -> ast  [label="parse"];
-    ast  -> exec [label="extract (§3)"];
+    ast  -> exec [label="extract (§3, §14)"];
     exec -> bash [label="check (§9)"];
 
-    src  -> pic_src [label="dot -Tpng",        style=dashed];
+    src  -> pic_src [label="dot -Tpng / modl", style=dashed];
     ast  -> pic_ast [label="gl_* + topology",  style=dashed];
 }
 ```
 
-`gripeline run foo.dot` =
+`gripeline run foo.dot` (or `gripeline run foo.modl`) =
 
-1. **Parse** the dot file (a real dot parser; comments `//`, `/* */`, `#` are
-   allowed; `node`/`edge`/`graph` default statements are honored).
-2. **Extract** the *execution graph* (§3) by reading only execution-relevant
-   information and discarding pure styling.
+1. **Parse** the source file (`dot` or `modl`; format is detected from the file
+   extension, `--lang=dot|modl`, or the leading token).
+2. **Extract** the *execution graph* (§3, §14) by reading only
+   execution-relevant information and discarding pure styling.
 3. **Check** executability (§9). If it fails, emit diagnostics and (optionally) a
    red-annotated copy of the graph, and stop.
 4. **Transpile** to bash and either print it (`gripeline build`) or run it
@@ -130,10 +140,14 @@ the second.
 > that runs.
 
 **Semantics live in `gl_*`, not in styling.** It is tempting to say "a dashed
-edge means sequencing." gripeline does *not* infer meaning from `style`/`color`,
-because that would make the same picture mean different things after a cosmetic
-edit. Instead, meaning is carried by reserved attributes, and the spec
-*recommends a matching visual convention* so the drawing looks like what it does:
+edge means sequencing." In `dot`, gripeline does *not* infer meaning from
+`style`/`color`, because that would make the same picture mean different things
+after a cosmetic edit (in `modl`, which has no key-value attribute syntax, a
+small set of shapes and the `dashed` line style carry default roles and control
+edge kinds while `#gl` comment pragmas carry explicit attributes; see
+[§14](#14-modl-source)). Instead, meaning is carried by reserved attributes, and
+the spec *recommends a matching visual convention* so the drawing looks like
+what it does:
 
 | meaning            | reserved attribute     | recommended styling (optional) |
 |--------------------|------------------------|--------------------------------|
@@ -151,8 +165,8 @@ convention, but conforming default behavior reads only `gl_*` + topology.
 ## 4. Three mappings
 
 The same shell concepts — **programs**, **streams/files**, **the wiring between
-them** — can be assigned to dot's **nodes** and **edges** in three ways, which
-this spec names by what a *node* represents:
+them** — can be assigned to a graph's **nodes** and **edges** in three ways,
+which this spec names by what a *node* represents:
 
 | mapping        | a **node** is…        | an **edge** is…   | best at                         |
 |----------------|-----------------------|-------------------|---------------------------------|
@@ -265,14 +279,14 @@ out.
 
 **Node roles** (from `shape`, or explicitly `gl_role=…`):
 
-| role      | how to write it                       | meaning                              |
-|-----------|---------------------------------------|--------------------------------------|
-| `program` | `shape=box`/default, or any box-ish   | a command (text from `label`/id)     |
-| `file`    | `shape=note`                          | a file on disk (`label` = path)      |
-| `stream`  | `shape=cds`                           | a named buffer / fifo                |
-| `value`   | `shape=oval` + `gl_role=value`        | a variable (§7)                      |
-| `op`      | `shape=box` + multiple typed inputs   | a multi-input program / merge point  |
-| `control` | `gl_role=for`/`while`/`if`/`function` | a control construct (§6, §8)         |
+| role      | how to write it (dot)                 | how to write it (modl)             | meaning                              |
+|-----------|---------------------------------------|------------------------------------|--------------------------------------|
+| `program` | `shape=box`/default, or any box-ish   | `square` / neutral (`circle`/`none`) | a command (text from `label`/id)   |
+| `file`    | `shape=note`                          | `hex`                              | a file on disk (`label` = path)      |
+| `stream`  | `shape=cds`                           | `triangle`                         | a named buffer / fifo                |
+| `value`   | `shape=oval` + `gl_role=value`        | `diamond`                          | a variable (§7)                      |
+| `op`      | `shape=box` + multiple typed inputs   | `#gl role=op`                      | a multi-input program / merge point  |
+| `control` | `gl_role=for`/`while`/`if`/`function` | `#gl begin …` (§14.2)              | a control construct (§6, §8)         |
 
 **Edge meaning by endpoint roles:**
 
@@ -319,9 +333,10 @@ than color. When a file genuinely needs to mix styles, that is what the **Typed*
 mapping is for (per-element roles).
 
 For *locality* without a second reading frame, use dot's own per-subgraph
-**default attributes** to give a region a flavor. `gl_role` and `gl_edge`
-defaults cascade exactly like any other dot attribute, so a cluster can lean
-toward, say, value nodes or sequencing edges without restating roles per element:
+**default attributes** (or `default.role=` / `default.edge=` on a `#gl begin`
+block in `modl`) to give a region a flavor. `gl_role` and `gl_edge` defaults
+cascade into child blocks, so a cluster can lean toward, say, value nodes or
+sequencing edges without restating roles per element:
 
 ```dot
 digraph {
@@ -345,7 +360,8 @@ changing what a node fundamentally *is*.
 Graphviz nodes have named **ports** — the little connection points you can attach
 edges to. gripeline maps **ports to file descriptors**, which makes stream
 routing visually exact and absorbs the parts of bash redirection that are usually
-hard to read.
+hard to read. (In `modl`, where `:` is a legal node-id character, ports are
+written on the edge pragma as `#gl from=err to=out`; see [§14.2](#142-the-gl-pragma-language).)
 
 **Port → fd mapping** (names are case-insensitive; either form works):
 
@@ -419,11 +435,11 @@ expresses these with **control edges** and **clusters**.
 
 A control edge carries ordering, not a stream. Set `gl_edge`:
 
-| `gl_edge` | bash between tail and head | recommended styling          |
-|-----------|----------------------------|------------------------------|
-| `seq`     | `tail ; head`              | `style=dashed`               |
-| `and`     | `tail && head`             | `color=darkgreen,label="&&"` |
-| `or`      | `tail \|\| head`           | `color=orange,label="\|\|"`  |
+| `gl_edge` | bash between tail and head | recommended styling (dot)    | modl shorthand (§14.1) |
+|-----------|----------------------------|------------------------------|------------------------|
+| `seq`     | `tail ; head`              | `style=dashed`               | `dashed` or `dashed ;` |
+| `and`     | `tail && head`             | `color=darkgreen,label="&&"` | `dashed &&`            |
+| `or`      | `tail \|\| head`           | `color=orange,label="\|\|"`  | `dashed \|\|`          |
 
 ```dot
 digraph {                                   // make && make install || echo FAIL
@@ -451,7 +467,8 @@ enough control edges to disambiguate.
 
 ### 6.2 Grouping — subshells, brace groups, functions
 
-A `subgraph cluster_*` is a group. Its `gl_role` chooses the kind:
+A `subgraph cluster_*` (or `#gl begin ID … #gl end` in `modl`) is a group. Its
+`gl_role` chooses the kind:
 
 | cluster `gl_role`          | bash                           |
 |----------------------------|--------------------------------|
@@ -477,7 +494,8 @@ digraph {
 
 ## 7. Variables and command substitution
 
-A **value node** (`gl_role=value`, drawn `shape=oval`) is a shell variable.
+A **value node** (`gl_role=value`, drawn `shape=oval` in `dot` or `diamond` in
+`modl`) is a shell variable.
 
 - **Definition.** The node's `label` is `NAME=expr`, or just a value with the id
   as the name. `today [gl_role=value,label="today=$(date +%F)"]` → `today=$(date
@@ -515,8 +533,9 @@ Two flavors, matching bash's two common loop shapes.
 
 ### 8.1 Iteration loops — annotated cluster
 
-A `subgraph cluster_*` with a `gl_loop` attribute is a loop body; the attribute
-is the loop header, and the cluster's contents are the body, run per iteration.
+A `subgraph cluster_*` (or `#gl begin ID` block in `modl`) with a `gl_loop`
+(`loop=` in `modl`) attribute is a loop body; the attribute is the loop header,
+and the cluster's contents are the body, run per iteration.
 
 ```dot
 digraph {                                 //  for f in *.txt; do
@@ -570,15 +589,15 @@ a back-edge.
 
 Many valid pictures are not valid programs. gripeline distinguishes the two and,
 when a graph can't run, reports why — both as text on stderr and, with
-`--annotate`, as a copy of the graph where the offending elements get
-`color=red`, a `tooltip`, and a `gl_error="…"` attribute, so the *rendered
-picture explains itself*.
+`--annotate`, as a copy of the graph where the offending elements are colored
+red and annotated with the diagnostic message, so the *rendered picture explains
+itself*.
 
 **Executability conditions** (failing any one makes the graph not executable):
 
 | code | condition                                                       | reported reason |
 |------|-----------------------------------------------------------------|-----------------|
-| E01  | graph is `digraph` (not undirected `graph`)                     | "data flow needs direction; use `digraph`" |
+| E01  | graph is `digraph` (not undirected `graph`; N/A in `modl`)      | "data flow needs direction; use `digraph`" |
 | E02  | every program node has operation text (non-empty label or id)  | "node `x` has no operation" |
 | E03  | no two data edges target the same fd of one node without a defined merge | "fd 0 of `x` has 2 inputs; use fan-in (`gl_role=op`/`cat`)" |
 | E04  | data edges are acyclic *unless* the cycle is a declared `coproc`/loop | "data cycle `x→y→x` without loop/coproc semantics" |
@@ -587,6 +606,9 @@ picture explains itself*.
 | E07  | a port refers to a fd only on a node that has one (no fds on file/value) | "`f:err` — file nodes have no fd 2" |
 | E08  | at most one capture target per value, no conflicting captures  | "value `v` captured by 2 commands" |
 | E09  | a node has at most one fd dup, and no dup competing with a redirect of the same fd | "fd dups on `x` are order-sensitive; use `gl_raw`" |
+| E10  | every `#gl` pragma in `modl` has known keys, valid values/ports, balanced blocks, and non-conflicting group ids | "unknown pragma key / invalid port / unbalanced `#gl begin`" |
+| E11  | every `dashed` control edge in `modl` (Commands/Typed) has text `&&`, `\|\|`, `;`, or empty | "dashed edge has invalid control text (expected `&&`, `\|\|`, or `;`)" |
+| E12  | every shell variable or function name is a valid shell identifier (`[A-Za-z_][A-Za-z0-9_]*`) | "variable/function name `my-var` is not a valid shell identifier" |
 
 **Output contract for a non-executable graph:**
 
@@ -599,8 +621,9 @@ gripeline: pipeline.dot not executable (2 problems)
 exit status: 65
 ```
 
-Exit codes: `0` ran OK; `65` not executable (static check failed); `>0` other
-codes propagate the bash pipeline's status (`pipefail` semantics by default).
+Exit codes: `0` ran OK; `2` CLI or syntax/parse error; `65` not executable
+(static check failed); `>0` other codes propagate the bash pipeline's status
+(`pipefail` semantics by default).
 
 A graph that is *executable* may still be *un-drawable nicely*, and vice versa;
 the two properties are independent, which is the whole point.
@@ -609,40 +632,42 @@ the two properties are independent, which is the whole point.
 
 ## 10. Reserved attribute reference
 
-All gripeline attributes live in the `gl_*` namespace so they never collide with
-Graphviz's own attributes, and so Graphviz simply ignores them when drawing.
+All gripeline attributes live in the `gl_*` namespace in `dot` (and in `#gl`
+comment pragmas without the `gl_` prefix in `modl`, §14.2) so they never collide
+with the renderer's own attributes.
 
 **Graph attributes**
 
-| attribute       | values                       | meaning                          |
-|-----------------|------------------------------|----------------------------------|
-| `gl_mapping`    | `commands` `dataflow` `typed`| default convention (§4.4)        |
-| `gl_prologue`   | shell text                   | replaces default `set -euo pipefail` |
-| `gl_shell`      | `bash` (only, for now)       | target shell                     |
+| dot attribute   | modl pragma        | values                       | meaning                          |
+|-----------------|--------------------|------------------------------|----------------------------------|
+| `gl_mapping`    | `#gl mapping=…`    | `commands` `dataflow` `typed`| default convention (§4.4)        |
+| `gl_prologue`   | `#gl prologue=…`   | shell text                   | replaces default `set -euo pipefail` |
+| `gl_shell`      | `#gl shell=…`      | `bash` (only, for now)       | target shell                     |
 
 **Node attributes**
 
-| attribute    | values                                           | meaning                       |
-|--------------|--------------------------------------------------|-------------------------------|
-| `gl_role`    | `program` `file` `stream` `value` `op` `coproc` `for` `while` `until` `if` `function` `subshell` `group` | role (§4.3, §6, §8) |
-| `gl_name`    | identifier                                       | variable/function/capture name |
-| `gl_append`  | `true`                                           | file write uses `>>`          |
-| `gl_async`   | `true`                                           | run in background (`&`)       |
-| `gl_loop`    | loop header string                               | cluster is a loop (§8)        |
-| `gl_raw`     | shell text                                       | escape hatch: emit verbatim   |
+| dot attribute | modl pragma    | values                                           | meaning                       |
+|---------------|----------------|--------------------------------------------------|-------------------------------|
+| `gl_role`     | `role=…`       | `program` `file` `stream` `value` `op` `coproc` `for` `while` `until` `if` `function` `subshell` `group` | role (§4.3, §6, §8) |
+| `gl_name`     | `name=…`       | identifier                                       | variable/function/capture name |
+| `gl_append`   | `append=true`  | `true` / `false`                                 | file write uses `>>`          |
+| `gl_async`    | `async=true`   | `true` / `false`                                 | run in background (`&`)       |
+| `gl_loop`     | `loop=…`       | loop header string                               | cluster is a loop (§8)        |
+| `gl_raw`      | `raw=…`        | shell text                                       | escape hatch: emit verbatim   |
 
 **Edge attributes**
 
-| attribute    | values                  | meaning                                   |
-|--------------|-------------------------|-------------------------------------------|
-| `gl_edge`    | `pipe`(default) `seq` `and` `or` `redirect` | edge kind (§3, §6)        |
-| `gl_stderr`  | path / `2>&1`           | (Dataflow) fd routing for a program edge  |
-| `gl_fd`      | raw redirection         | (Dataflow) arbitrary fd op on the edge    |
+| dot attribute | modl pragma         | values                  | meaning                                   |
+|---------------|---------------------|-------------------------|-------------------------------------------|
+| `gl_edge`     | `edge=…`            | `pipe`(default) `seq` `and` `or` `redirect` | edge kind (§3, §6)    |
+| `gl_stderr`   | `stderr=…`          | path / `2>&1`           | (Dataflow) fd routing for a program edge  |
+| `gl_fd`       | `fd=…`              | raw redirection         | (Dataflow) arbitrary fd op on the edge    |
+| *(port)*      | `from=…` / `to=…`   | `in` `out` `err` `0`…   | tail / head fd port in `modl` (§5, §14.2) |
 
 **Operation text** comes from `label` (node, or edge in the Dataflow mapping),
-falling back to the node id. Anything inside `label` is treated as a bash
-command/word list and emitted as written (you quote inside the label exactly as
-you would in bash).
+falling back to the node id. Anything inside `label` (or a `modl` node/edge raw
+text slice, §14.1 D1) is treated as a bash command/word list and emitted as
+written (you quote inside the label exactly as you would in bash).
 
 ---
 
@@ -650,21 +675,25 @@ you would in bash).
 
 A conforming **transpiler**:
 
-1. MUST parse standard `dot`, including `subgraph`, ports, and default
-   `node`/`edge`/`graph` statements.
-2. MUST ignore every attribute outside the reserved set and the small role-shape
-   set; in particular it MUST NOT change behavior based on `color`, `style`,
-   `pos`, `fontname`, etc. (unless `--infer-style` is explicitly requested).
+1. MUST parse standard `dot` (including `subgraph`, ports, and default
+   `node`/`edge`/`graph` statements) and standard `modl` (including `#gl`
+   comment pragmas and `#gl begin` / `#gl end` blocks).
+2. MUST ignore every attribute outside the reserved set and the role-shape /
+   modl-dashed set; in particular it MUST NOT change behavior based on `color`,
+   `pos`, `fontname`, `size`, `url`, or `background` (unless `--infer-style` is
+   explicitly requested).
 3. MUST run the §9 static check before emitting bash and refuse non-executable
-   graphs with the documented exit code.
+   graphs with exit code `65` (and refuse syntax/parse errors with exit code `2`).
 4. MUST emit bash whose behavior, under the (possibly overridden) prologue,
-   realizes the semantics in §§4–8. The emitted bash is the normative meaning.
+   realizes the semantics in §§4–8. The emitted bash is the normative meaning,
+   and equivalent `dot` and `modl` sources MUST transpile to the same bash.
 5. SHOULD offer `gripeline build` (print bash) distinct from `gripeline run`.
-6. SHOULD offer `--annotate` to write a diagnostic-annotated `dot` copy.
+6. SHOULD offer `--annotate` to write a diagnostic-annotated `.annotated.dot` or
+   `.annotated.modl` copy.
 
-A conforming **diagram** is any `dot` file; conformance is a property of the
-*tool*, not the source. Every diagram is renderable; the tool decides
-executability per §9.
+A conforming **diagram** is any valid `dot` or `modl` file; conformance is a
+property of the *tool*, not the source. Every diagram is renderable; the tool
+decides executability per §9.
 
 The test harness in [`tests/`](tests/) encodes this contract as fixtures (see
 [tests/README.md](tests/README.md)).
@@ -673,10 +702,11 @@ The test harness in [`tests/`](tests/) encodes this contract as fixtures (see
 
 ## 12. Example gallery
 
-Each example gives the **bash** first (the gloss), then the **same program in all
-three mappings**. Recall the recommended workflow is to *author* in whichever
-mapping reads best; these side-by-sides exist to show the correspondence. Every
-example here also exists as a fixture under `tests/cases/`.
+Each example gives the **bash** first (the gloss), then the **same program in
+`dot` and `modl`**. Recall the recommended workflow is to *author* in whichever
+mapping and source language reads best; these side-by-sides exist to show the
+correspondence. Every example here also exists as a twin fixture under
+`tests/cases/`.
 
 ### 12.1 A plain three-stage pipe
 
@@ -688,16 +718,35 @@ cat access.log | grep 404 | wc -l
   a[label="cat access.log"] b[label="grep 404"] c[label="wc -l"]
   a -> b -> c }
 ```
+```modl
+#gl mapping=commands
+a square cat access.log
+b square grep 404
+c square wc -l
+a -> b -> c
+```
 ```dot
 /* Dataflow */ digraph { gl_mapping="dataflow"
   access_log -> hits [label="grep 404"]
   hits -> n          [label="wc -l"]
   access_log [shape=note,label="access.log"] }
 ```
+```modl
+#gl mapping=dataflow
+access_log -> hits grep 404
+hits       -> n    wc -l
+access_log hex access.log
+```
 ```dot
 /* Typed */ digraph {
   log[shape=note,label="access.log"] g[label="grep 404"] w[label="wc -l"]
   log -> g -> w }
+```
+```modl
+log hex    access.log
+g   square grep 404
+w   square wc -l
+log -> g -> w
 ```
 *Commands is shortest here; Dataflow pays for naming the streams.*
 
@@ -713,17 +762,39 @@ grep 404 < access.log | wc -l > counts.txt
   g[label="grep 404"] w[label="wc -l"]
   in -> g -> w -> out }
 ```
+```modl
+#gl mapping=commands
+in  hex    access.log
+out hex    counts.txt
+g   square grep 404
+w   square wc -l
+in -> g -> w -> out
+```
 ```dot
 /* Dataflow */ digraph { gl_mapping="dataflow"
   access_log -> hits [label="grep 404"]
   hits -> counts     [label="wc -l"]
   access_log[shape=note,label="access.log"] counts[shape=note,label="counts.txt"] }
 ```
+```modl
+#gl mapping=dataflow
+access_log -> hits   grep 404
+hits       -> counts wc -l
+access_log hex access.log
+counts     hex counts.txt
+```
 ```dot
 /* Typed */ digraph {
   in[shape=note,label="access.log"] out[shape=note,label="counts.txt"]
   g[label="grep 404"] w[label="wc -l"]
   in -> g -> w -> out }
+```
+```modl
+in  hex    access.log
+out hex    counts.txt
+g   square grep 404
+w   square wc -l
+in -> g -> w -> out
 ```
 
 ### 12.3 stderr routing (`2>` and `2>&1`)
@@ -738,16 +809,32 @@ make 2>&1 | grep -i error    # case 2
   make[label="make"]
   make:err -> errlog }
 ```
+```modl
+errlog hex    build.err
+make   square make
+make -> errlog #gl from=err
+```
 ```dot
 /* Commands/Typed, case 2 */ digraph {
   make[label="make"] g[label="grep -i error"]
   make:err -> make:out        // 2>&1
   make:out -> g }             // | grep -i error
 ```
+```modl
+make square make
+g    square grep -i error
+make -> make #gl from=err to=out
+make -> g    #gl from=out
+```
 ```dot
 /* Dataflow, case 2 (fd via edge attrs) */ digraph { gl_mapping="dataflow"
   build -> errs [label="grep -i error", gl_stderr="2>&1"]
   build[label="make"] }
+```
+```modl
+#gl mapping=dataflow
+build -> errs grep -i error #gl stderr="2>&1"
+build make
 ```
 *Ports make fd routing crisp in Commands/Typed; Dataflow expresses it with edge
 attributes.*
@@ -769,6 +856,21 @@ sort data.txt | tee >(head -1 > first.txt) >(tail -1 > last.txt) > sorted.txt
   s -> t  t -> last    // branch 2
 }
 ```
+```modl
+data   hex    data.txt
+sorted hex    sorted.txt
+first  hex    first.txt
+last   hex    last.txt
+s      square sort
+h      square head -1
+t      square tail -1
+data -> s
+s -> sorted
+s -> h
+h -> first
+s -> t
+t -> last
+```
 ```dot
 /* Dataflow */ digraph { gl_mapping="dataflow"
   data -> sorted [label="sort"]
@@ -776,6 +878,16 @@ sort data.txt | tee >(head -1 > first.txt) >(tail -1 > last.txt) > sorted.txt
   sorted -> last  [label="tail -1"]
   data[shape=note,label="data.txt"] sorted[shape=note,label="sorted.txt"]
   first[shape=note,label="first.txt"] last[shape=note,label="last.txt"] }
+```
+```modl
+#gl mapping=dataflow
+data   -> sorted sort
+sorted -> first  head -1
+sorted -> last   tail -1
+data   hex data.txt
+sorted hex sorted.txt
+first  hex first.txt
+last   hex last.txt
 ```
 *Fan-out is where Dataflow reads best: one value, several consumers, no `tee`
 noise.*
@@ -796,6 +908,16 @@ cat <(curl -s host1/metrics) <(curl -s host2/metrics) | sort | uniq -c
   merge -> s -> u
 }
 ```
+```modl
+c1    square curl -s host1/metrics
+c2    square curl -s host2/metrics
+merge square cat #gl role=op
+s     square sort
+u     square uniq -c
+c1 -> merge
+c2 -> merge
+merge -> s -> u
+```
 ```dot
 /* Dataflow (needs an op node too — Dataflow's awkward case) */
 digraph { gl_mapping="dataflow"
@@ -803,6 +925,12 @@ digraph { gl_mapping="dataflow"
   m2 -> merged [label="curl -s host2/metrics"]   // two edges into one value node
   merged -> counted [label="sort | uniq -c"]
 }
+```
+```modl
+#gl mapping=dataflow
+m1     -> merged  curl -s host1/metrics
+m2     -> merged  curl -s host2/metrics
+merged -> counted sort | uniq -c
 ```
 *Multi-input forces an `op`/merge node; this is the seam where both Commands and
 Dataflow bend toward Typed.*
@@ -818,6 +946,13 @@ make && make install || echo FAIL
   make -> inst [gl_edge=and, style=dashed, color=darkgreen]
   inst -> fail [gl_edge=or,  style=dashed, color=orange]
 }
+```
+```modl
+make square make
+inst square make install
+fail square echo FAIL
+make -> inst dashed green &&
+inst -> fail dashed orange ||
 ```
 *Dataflow is ill-suited to control flow; author conditionals in Commands/Typed.*
 
@@ -838,6 +973,16 @@ backup > out.tgz.gpg
   call -> out
 }
 ```
+```modl
+#gl begin cluster_backup role=function name=backup
+t square tar czf - "$DIR"
+g square gpg -e
+t -> g
+#gl end
+call square backup
+out  hex    out.tgz.gpg
+call -> out
+```
 
 ### 12.8 Variables and command substitution
 
@@ -855,12 +1000,29 @@ echo "building $ver" | tee build.log
   echo -> tee -> log
 }
 ```
+```modl
+git  square  git describe --tags
+ver  diamond #gl name=ver
+echo square  echo "building $ver"
+tee  square  tee
+log  hex     build.log
+git -> ver #gl name=ver
+ver -> echo
+echo -> tee -> log
+```
 ```dot
 /* Dataflow (variable = node, very natural) */ digraph { gl_mapping="dataflow"
   ver[label="$(git describe --tags)"]
   ver -> announced [label="echo \"building $ver\""]
   announced -> log [label="tee"]
   log[shape=note,label="build.log"] }
+```
+```modl
+#gl mapping=dataflow
+ver $(git describe --tags)
+ver       -> announced echo "building $ver"
+announced -> log       tee
+log hex build.log
 ```
 
 ### 12.9 A `for` loop
@@ -875,6 +1037,11 @@ for f in *.txt; do gzip -k "$f"; done
     z[label="gzip -k \"$f\""]
   }
 }
+```
+```modl
+#gl begin each loop="for f in *.txt"
+z square gzip -k "$f"
+#gl end
 ```
 
 ### 12.10 A streaming `while read` loop
@@ -893,6 +1060,15 @@ sort hosts | while read h; do ping -c1 "$h"; done
   }
   sort -> cluster_ping            // data edge into a loop = its stdin
 }
+```
+```modl
+hosts hex    hosts
+sort  square sort
+hosts -> sort
+#gl begin ping loop="while read h"
+p square ping -c1 "$h"
+#gl end
+sort -> ping
 ```
 
 ### 12.11 A fuller script (everything together)
@@ -937,14 +1113,37 @@ digraph deploy {
   ver -> cluster_each                               // ordering: ver before loop
 }
 ```
+```modl
+#gl prologue="set -euo pipefail"
+git square  git describe --tags
+ver diamond #gl name=ver
+git -> ver  #gl name=ver
 
-This single file renders as a deploy diagram *and* runs as the script above.
+#gl begin each loop="for svc in api web worker"
+build square docker build -t "$svc:$ver" "./$svc"
+push  square docker push "$svc:$ver"
+fail  square echo "FAILED $svc"
+flog  hex    failures.log #gl append=true
+build -> push dashed &&
+push  -> fail dashed ||
+fail  -> flog
+#gl end
+
+each -> tee
+tee  square tee
+blog hex    build.log
+tee  -> blog
+ver  -> each dashed
+```
+
+Both files render as a deploy diagram *and* run as the exact same bash script
+above.
 
 ---
 
 ## 13. Resolved decisions
 
-All design questions raised through Draft 0.2 are now resolved and folded into
+All design questions raised through Draft 0.4 are now resolved and folded into
 the sections noted:
 
 1. **Data cycles** (§8.2, §9 E04) — an undeclared data cycle is *not executable*;
@@ -953,9 +1152,9 @@ the sections noted:
    `gl_async=true` opts a node into background execution (`&` + `wait`).
 3. **Ordering ambiguity** (§6.1) — resolved *deterministically by source order*;
    `--strict` turns ambiguity into an error instead.
-4. **Quoting boundary** (§7, §10) — label text is emitted *literally*; gripeline
-   never re-quotes. The `gl_raw` attribute is the escape hatch for anything the
-   readable forms can't express.
+4. **Quoting boundary** (§7, §10, §14.1 D1) — label text is emitted *literally*;
+   gripeline never re-quotes. The `gl_raw` attribute is the escape hatch for
+   anything the readable forms can't express.
 5. **Arbitrary file descriptors** (§5, §9 E09) — any port number is first-class
    for *routing* (`gen:3 -> file` → `3> file`); fd *duplication* is limited to
    the order-independent `2>&1` shape, and order-sensitive dup surgery is an
@@ -965,7 +1164,115 @@ the sections noted:
 6. **Per-subgraph mappings** (§4.4) — `gl_mapping` stays *file-level only*; it is
    the file's single reading frame. Mixing styles is the job of the Typed mapping
    (per-element roles), and per-region *locality* is achieved with dot's native
-   cascading `gl_role`/`gl_edge` subgraph defaults — not a second mapping.
+   cascading `gl_role`/`gl_edge` subgraph defaults (or `default.role=` /
+   `default.edge=` on a `#gl begin` block in `modl`) — not a second mapping.
 
-**Open questions:** none at this time. New questions will be added here as the
-transpiler implementation surfaces them.
+---
+
+## 14. modl source
+
+[`modl`](https://modl.hashbin.page/) is a lightweight, line-oriented diagram
+language. A `.modl` file can be opened and edited directly in the
+[modl editor](https://modl.hashbin.page/) and executed by `gripeline` with zero
+changes to modl's own grammar.
+
+### 14.1 Design rules (D1–D5)
+
+- **D1. Operation text is the raw source slice.** `gripeline` takes a node's (or
+  edge's) operation text as the exact source characters from the first text word
+  to the start of the `#` comment, with trailing whitespace trimmed (and an
+  explicit `""` treated as an empty label for E02). Thus:
+  ```modl
+  echo square echo "building $ver"
+  ```
+  renders in the modl editor as `echo building $ver` (modl strips quotes when
+  displaying text) and runs in bash as `echo "building $ver"`. This preserves
+  §13.4 ("label text is emitted literally; gripeline never re-quotes").
+
+- **D2. Shape → role table (`modl` only).**
+
+  | modl shape                  | role                                                  |
+  |-----------------------------|-------------------------------------------------------|
+  | `square`                    | `program`                                             |
+  | `hex`                       | `file`                                                |
+  | `triangle`                  | `stream`                                              |
+  | `diamond`                   | `value`                                               |
+  | `circle` (default), `none`  | mapping default (`program`; `value` in `dataflow`)    |
+
+  An explicit `#gl role=…` pragma always wins. Leaving `circle` and `none`
+  neutral means an unstyled diagram (`a -> b -> c`) is a plain Commands pipe.
+  Size (`small`, `medium`, `big`), color, URL, and `background` lines never
+  affect execution.
+
+- **D3. Line style → edge kind (`modl` only).**
+  - `solid` (default), `bold`, `dotted` → data edge (pipe or redirect, decided
+    by endpoint roles).
+  - `dashed` → **control edge** in the `commands` and `typed` mappings. Its kind
+    comes from the edge text: `&&` → `and`, `||` → `or`, `;` or empty text →
+    `seq`. Any other text on a `dashed` edge (without `#gl edge=…`) is an error
+    (**E11**), preventing typos from silently changing control flow. In the
+    `dataflow` mapping, edge text is the command, so control kinds there come
+    from `#gl edge=and|or|seq` only.
+  - `#gl edge=…` always wins.
+
+- **D4. Format detection.** `.modl` selects `modl`, `.dot`/`.gv` selects `dot`,
+  and `--lang=modl|dot` overrides. Otherwise `gripeline` sniffs the first token:
+  `strict`/`digraph`/`graph` selects `dot`, and anything else selects `modl`.
+  Inline share links (`https://modl.hashbin.page/#h1=…`) are decoded locally
+  from `base64url(JSON {src, pos})` and parsed as `modl` without network access
+  (256t CID links are refused with an explanation).
+
+- **D5. `modl` parse errors are fatal.** Although the modl editor skips invalid
+  lines and renders the rest, `gripeline` refuses to run a partially-parsed
+  program and exits `2` with modl's diagnostic (`Line N: invalid node id "x"`,
+  `Line N: empty node id`, `Line N: malformed edge line`).
+
+### 14.2 The `#gl` pragma language
+
+A pragma is a `modl` comment whose body begins with `gl` followed by whitespace
+(`#gl …` at the start of a line or after whitespace). Because `modl`'s lexer
+discards comments, pragmas are completely invisible to the modl renderer. Inside
+a pragma, attributes are `key=value` words (using the §10 names without the
+`gl_` prefix), values may be double-quoted with `\"` and `\\` escapes, and a
+trailing `# …` after whitespace starts a normal comment. Unknown keys or invalid
+values are reported as **E10**.
+
+1. **Trailing pragmas** attach to the element on that line:
+   - On a **node line**, valid keys are `role`, `name`, `append`, `async`, `raw`.
+     Node lines can repeat; later lines win key-by-key, matching modl's own
+     redefinition rule.
+   - On an **edge line**, valid keys are `edge`, `stderr`, `fd`, `name`, plus
+     ports `from=` (tail port) and `to=` (head port) using the §5 names
+     (`in`/`out`/`err`/`0`/`1`/`2`/`3`…). On a chain `a -> b -> c`, trailing
+     attributes and pragmas apply to every edge in the chain.
+
+2. **Whole-line pragmas** stand on their own line:
+   - `#gl mapping=commands|dataflow|typed`, `#gl prologue="…"`, `#gl shell=bash`
+     set graph attributes.
+   - `#gl node ID key=val…` sets attributes on node `ID` without restyling it.
+   - Whole-line `#gl edge …` is not allowed (**E10**); use a trailing pragma on
+     the edge line.
+
+3. **Block pragmas (`#gl begin` / `#gl end`)** express clusters and loops:
+   - `#gl begin ID key=val…` and `#gl end` open and close a nestable group `ID`.
+     Valid keys are `role=subshell|group|function|for|while|until`, `name=…`,
+     `loop=…`, and member defaults `default.role=…` and `default.edge=…`.
+   - A node belongs to the innermost block where it is *first mentioned* (node
+     line or edge endpoint); lines outside the block can still visually style it.
+   - Using `ID` as an edge endpoint addresses the group itself (e.g.
+     `each -> tee` pipes the loop's stdout into `tee`). In `modl`, `ID` can also
+     be styled as a visible stand-in node (e.g. `each big diamond for each svc`),
+     but giving a group `ID` a node `role` is an error (**E10**).
+
+### 14.3 `--annotate` and lints for `modl`
+
+Running with `--annotate` on a non-executable `.modl` file writes
+`<name>.annotated.modl`: offending nodes get an appended `ID red` redefinition
+line, offending edge lines have `red` placed in their color slot, and each
+diagnostic is appended as a `# [Exx] …` comment so the file opens in the modl
+editor with offending elements highlighted in red.
+
+`gripeline` also emits non-fatal lint warnings on `stderr` for `modl` traps:
+a non-dashed edge whose text is `&&` or `||`, an unquoted `/path` swallowed by
+modl's URL slot (e.g. `/usr/bin/wc -l`), and visible labels over 22 characters
+(which the modl renderer truncates on screen).

@@ -24,6 +24,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Checkout curtcox/modl for parser cross-check
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          repository: curtcox/modl
+          path: .modl-repo
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -34,10 +41,10 @@ jobs:
       - name: Run conformance tests
         # Informational: prints the pass/fail table to the build log. The site
         # build re-runs the checks itself, so this does not gate the deploy.
-        run: GRIPELINE='python3 gripeline.py' python3 tests/run.py || true
+        run: MODL_REPO="${GITHUB_WORKSPACE}/.modl-repo" GRIPELINE='python3 gripeline.py' python3 tests/run.py || true
 
       - name: Build site
-        run: python3 site/build.py site/_site
+        run: MODL_REPO="${GITHUB_WORKSPACE}/.modl-repo" python3 site/build.py site/_site
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
