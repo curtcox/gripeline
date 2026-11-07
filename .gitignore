@@ -4,3 +4,6 @@ site/_site/
 # Python
 __pycache__/
 *.pyc
+
+# Agent-local settings
+.claude/settings.local.json

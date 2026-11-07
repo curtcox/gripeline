@@ -1,5 +1,10 @@
 # Implementation prompt — build the `gripeline` transpiler
 
+> **Historical.** This is the original brief used to build `gripeline.py`, and
+> that work is done. It is kept as a design record. It is not a task. For
+> current instructions see [AGENTS.md](AGENTS.md). For open work see
+> [MODL_REVIEW_PLAN.md](MODL_REVIEW_PLAN.md).
+
 You are implementing **gripeline**, a transpiler that turns an ordinary Graphviz
 `dot` file or [`modl`](https://modl.hashbin.page/) diagram into a `bash` script.
 The full language is defined in [`SPEC.md`](SPEC.md) (Draft 0.4). Read it end to

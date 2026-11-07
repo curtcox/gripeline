@@ -37,6 +37,7 @@ modl-valid, and lint still run, so the fixtures are always validated.
 Usage:
     python3 tests/run.py [name-substring ...]   # filter cases by name
     python3 tests/run.py --list                 # list cases and exit
+    python3 tests/run.py -q                     # quiet: print only failures + summary
 """
 from __future__ import annotations
 
@@ -459,7 +460,8 @@ def main(argv: list[str]) -> int:
             print(f"{c0.name:40s} [{langs:8s}] expect={c0.expect}  {c0.path.relative_to(ROOT)}")
         return 0
 
-    filters = [a for a in argv if not a.startswith("--")]
+    quiet = "-q" in argv or "--quiet" in argv
+    filters = [a for a in argv if not a.startswith("-")]
     cases = discover(filters)
     if not cases:
         print("no cases found", file=sys.stderr)
@@ -491,6 +493,8 @@ def main(argv: list[str]) -> int:
             else:
                 marks.append(DIM("•" + chk.label))
                 n_skip += 1
+        if quiet and not case_failed:
+            continue
         head = RED("FAIL") if case_failed else GREEN("ok  ")
         print(f"  {head} {case.name:38s} {' '.join(marks)}")
 

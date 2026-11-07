@@ -19,7 +19,11 @@ tests/
 python3 tests/run.py                 # all cases
 python3 tests/run.py 12.4 fanin      # only cases whose name matches a filter
 python3 tests/run.py --list          # list cases without running
+python3 tests/run.py -q              # quiet: only failing cases + summary
 ```
+
+From the repo root, `make check` runs the fixtures (quiet) and the unit tests
+together, using `../modl` for parity checks if it exists.
 
 Point the harness at your transpiler with `GRIPELINE`:
 

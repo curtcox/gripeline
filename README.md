@@ -68,3 +68,10 @@ plus the Graphviz `dot` CLI for rendering. Build it locally with:
 ```bash
 python3 site/build.py        # writes site/_site/ ; open site/_site/index.html
 ```
+
+## Contributing
+
+Run `make check` (the conformance fixtures plus unit tests; Python 3 standard
+library only). [AGENTS.md](AGENTS.md) has the full contributor guide: the
+rules, a code map, and contracts that are easy to break. It is written for
+both people and coding agents.
