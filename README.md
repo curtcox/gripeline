@@ -115,3 +115,11 @@ uploads). CID syntax and content verification use t256's SHA-512 identifiers.
 The Apptron target remains disabled until its gripeline overlay is released.
 HashBin publishing and a canonical dedicated origin require external app
 registration. See [EDITOR_PLAN.md](EDITOR_PLAN.md) for current phase status.
+
+The editor's environment badges combine declared requirements with first command
+words. Baseline inventories are in `web/portable-tools.json`; native targets
+assume Python, Bash and t256 are installed. They are advice, not detection of
+your installed tools or a check of every shell option. The local-run dialog
+lets you select a platform and disables copying for excluded environments.
+Portable t256 count, save and transform examples are executed in each CI OS
+with the verified release binary.

@@ -2342,15 +2342,24 @@ def gripeline_api(src: str, lang: str | None = None, *, portable: bool = False) 
         engine = Engine(parse_source(src, resolved))
         problems = engine.run_checks()
         warnings = list(engine.warnings)
+        functions = {cl.attrs.get('gl_name', cid) for cid, cl in engine.clusters.items()
+                     if engine.cluster_kind(cid) == 'function'}
+        commands = []
+        for nd in engine.nodes.values():
+            if nd.role not in ('program', 'op', 'coproc'):
+                continue
+            try:
+                words = shlex.split(nd.attrs.get('gl_raw', engine.optext(nd)))
+            except ValueError:
+                words = []
+            while words and re.match(r'^[A-Za-z_][A-Za-z0-9_]*=', words[0]):
+                words.pop(0)
+            if words and words[0] not in functions and words[0] not in commands:
+                commands.append(words[0])
         if portable:
-            for nd in engine.nodes.values():
-                if nd.role in ('program', 'op', 'coproc'):
-                    try:
-                        words = shlex.split(engine.optext(nd))
-                    except ValueError:
-                        words = []
-                    if words and words[0] not in PORTABLE_TOOLS:
-                        warnings.append('portability: command ' + words[0] + ' is outside the portable set')
+            for command in commands:
+                if command not in PORTABLE_TOOLS:
+                    warnings.append('portability: command ' + command + ' is outside the portable set')
         marks = sorted(engine.offending_nodes) + ['L' + str(n) for n in sorted(engine.offending_edges)]
         details = []
         for code, message in problems:
@@ -2360,11 +2369,11 @@ def gripeline_api(src: str, lang: str | None = None, *, portable: bool = False) 
             details.append(dict(code=code, message=message, line=line, node=node))
         return dict(lang=resolved, bash='' if problems else engine.transpile(),
                     problems=details, warnings=warnings, marks=marks,
-                    cids=engine.cids, requires=engine.graph_attrs.get('gl_requires', '').split(),
+                    commands=commands, cids=engine.cids, requires=engine.graph_attrs.get('gl_requires', '').split(),
                     environments=engine.graph_attrs.get('gl_env', '').split())
     except GripError as error:
         return dict(lang=resolved, bash='', problems=[dict(code='parse', message=str(error), line=None, node=None)],
-                    warnings=[], marks=[], cids=[], requires=[], environments=[])
+                    warnings=[], marks=[], commands=[], cids=[], requires=[], environments=[])
 
 
 def is_url_arg(arg: str) -> bool:

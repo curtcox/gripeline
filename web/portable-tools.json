@@ -1,0 +1,5 @@
+{
+  "assumptions": "Native targets assume gripeline, Python, Bash, and t256 are installed. Badges check command names and declared requirements; they do not validate every shell option or detect tools installed on your computer.",
+  "common": ["echo", "printf", "cat", "tee", "sort", "uniq", "wc", "head", "tail", "cut", "tr", "sed", "grep", "awk", "find", "xargs", "test", "true", "false", "pwd", "cd", "mkdir", "rm", "cp", "mv", "touch", "basename", "dirname", "env", "sh", "bash", "t256"],
+  "environments": {"linux": ["python3"], "macos": ["python3"], "windows": ["py", "cmd.exe"], "apptron": ["python3"]}
+}

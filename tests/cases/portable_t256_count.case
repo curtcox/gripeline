@@ -1,0 +1,21 @@
+name: portable-t256-count
+spec: 14.5
+portable: true
+expect: contains
+=== dot ===
+digraph {
+  graph [gl_requires="t256 wc" gl_env="linux macos windows apptron"];
+  input [shape=note label="t256:AAAAAAAGaGVsbG8K"];
+  count [shape=box label="wc -c"];
+  input -> count;
+}
+=== modl ===
+#gl requires t256 wc
+#gl env linux macos windows apptron
+input hex t256:AAAAAAAGaGVsbG8K
+count square wc -c
+input -> count
+=== bash ===
+t256 load AAAAAAAGaGVsbG8K | wc -c
+=== stdout ===
+6

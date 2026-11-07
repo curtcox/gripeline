@@ -512,6 +512,11 @@ class EditorPrerequisites(unittest.TestCase):
             code, _, err = run_cli('run', gl.encode_share_link('a square echo café'))
         self.assertEqual(code, 0, err)
 
+    def test_api_reports_commands_after_assignments(self):
+        result = gl.gripeline_api('a square X=1 printf hi', portable=True)
+        self.assertEqual(result['commands'], ['printf'])
+        self.assertEqual(result['warnings'], [])
+
     def test_api_does_no_io(self):
         from unittest.mock import patch
         with patch('builtins.open', side_effect=AssertionError('I/O')), patch(

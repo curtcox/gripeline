@@ -1,0 +1,25 @@
+name: portable-t256-transform
+spec: 14.5
+portable: true
+expect: contains
+=== dot ===
+digraph {
+  graph [gl_requires="t256 tr" gl_env="linux macos windows apptron"];
+  input [shape=note label="t256:AAAAAAAGaGVsbG8K"];
+  upper [shape=box label="tr a-z A-Z"];
+  saved [shape=note label="t256:"];
+  input -> upper;
+  upper -> saved;
+}
+=== modl ===
+#gl requires t256 tr
+#gl env linux macos windows apptron
+input hex t256:AAAAAAAGaGVsbG8K
+upper square tr a-z A-Z
+saved hex t256:
+input -> upper
+upper -> saved
+=== bash ===
+t256 load AAAAAAAGaGVsbG8K | tr a-z A-Z | t256 save -f t256 -
+=== stdout ===
+t256:AAAAAAAGSEVMTE8K

@@ -91,6 +91,23 @@ jobs:
       - name: Run unit tests
         run: MODL_REPO="${GITHUB_WORKSPACE}/.modl-repo" python3 tests/test_units.py
 
+      - name: Test portable gallery with the pinned native t256
+        run: python3 scripts/check_portability.py
+
+      - name: Test Windows installers and launchers
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $destination = Join-Path $env:RUNNER_TEMP 'gripeline smoke'
+          ./install.ps1 -Destination $destination
+          $source = Join-Path $destination 'hello.modl'
+          [IO.File]::WriteAllText($source, 'a square printf windows', [Text.UTF8Encoding]::new($false))
+          foreach ($launcher in @('gripeline.cmd', 'gripeline.ps1')) {
+            $value = & (Join-Path $destination $launcher) run $source
+            if ($LASTEXITCODE -ne 0 -or $value -ne 'windows') { throw "Launcher failed: $launcher" }
+          }
+
+
   deploy:
     needs: build
     runs-on: ubuntu-latest

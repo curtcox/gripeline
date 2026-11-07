@@ -132,3 +132,11 @@ Editor/API regression tests in `test_units.py` compare the pure API against CLI
 build results for every fixture in both languages, test stdin and CID inputs,
 and check CID syntax and Bash discovery. `web/tests/` contains optional browser
 checks; these use Node/Playwright only and are separate from `make check`.
+
+Cases named `portable_*.case` carry `portable: true` and expected stdout for the
+separate native portability check. They do not require t256 during `make check`.
+`python3 scripts/check_portability.py` downloads a pinned, checksummed native
+t256 into a temporary directory, verifies the environment's baseline commands,
+executes both languages of every portable twin, and checks a saved CID envelope
+and tampered-content rejection. `--release-dir PATH` uses a local release cache.
+CI runs it on macOS, Linux and Windows.

@@ -11,10 +11,10 @@ criteria.
 | 2 | t256 producers/sinks, canonical CID validation, guard, E14, twin fixtures and spec | No remaining local compiler work identified |
 | 3 | Tested txtar builder, exact compiler embedding, local t256 configuration/store embedding, CID verification, compression and size/delimiter guards | t256 v0.1.0 published with a verified linux/386 binary. Apptron overlay, binary pin, release-input fingerprints and boot test are being implemented. Still needed: Apptron runtime release and real VM boot test. Run in Apptron is deliberately disabled until these exist |
 | 4 | Verified CID load and CID-based local command generation | HashBin Publish registration and save UI; dedicated origin and canonical/mirror migration; native round-trip on all OSes |
-| 5 | requires/env syntax, missing-tool guards, --portable advice, conservative declaration badges | Validated per-environment tool inventories, complete target disabling, portable t256 gallery executed on every OS and in the VM |
+| 5 | requires/env syntax, missing-tool guards, --portable advice, conservative declaration badges | Command inventories, per-platform missing-tool badges and excluded-target disabling are implemented. Three portable t256 twins pass on native macOS; the CI matrix now verifies baseline tools, native binaries, saved-envelope execution and tamper rejection. Linux/Windows follow-up and VM gallery checks are pending |
 
-Verification: `make check` (86 fixtures, 44 unit tests), site build, vendored
-asset verification, 5 Node contract tests and 7 Chromium Playwright tests. Modl
+Verification: `make check` (89 fixtures, 45 unit tests), site build, vendored
+asset verification, 6 Node contract tests and 8 Chromium Playwright tests. Modl
 passes 33 unit tests, native Chromium zoom/drag/export checks and all 17 shared
 Fragment Kit contracts.
 Graphviz and sibling modl parity tools were available locally. The browser

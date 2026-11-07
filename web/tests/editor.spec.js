@@ -98,3 +98,17 @@ test('explicit links preserve drafts and recovery stays visibly unverified',asyn
   await page.getByRole('button',{name:'Run locally',exact:true}).click();
   await expect(page.locator('#review')).toContainText('saved-draft');
 });
+test('environment declarations gate local commands and show missing tools',async({page})=>{
+  await page.goto('/editor/');
+  await page.getByLabel('Diagram source').fill('#gl env apptron\na square printf hi');
+  await expect(page.locator('#status')).toContainText('Checked');
+  await expect(page.getByRole('button',{name:'Run locally',exact:true})).toBeDisabled();
+  await page.getByLabel('Diagram source').fill('#gl env linux\n#gl requires jq\na square jq .');
+  await expect(page.locator('#badges')).toContainText('linux · needs jq');
+  await page.getByRole('button',{name:'Run locally',exact:true}).click();
+  await page.locator('#run-environment').selectOption('windows');
+  await expect(page.getByRole('button',{name:'Copy command',exact:true})).toBeDisabled();
+  await page.locator('#run-environment').selectOption('linux');
+  await expect(page.getByRole('button',{name:'Copy command',exact:true})).toBeEnabled();
+  await expect(page.locator('#run-target-note')).toContainText('jq');
+});

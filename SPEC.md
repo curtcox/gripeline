@@ -1406,7 +1406,10 @@ options across platforms. Advice never changes the exit status of `check`.
 `gripeline_api(src, lang=None)` is a pure, standard-library API returning
 `lang`, `bash`, `problems` (`code`, `message`, `line`, `node`), `warnings`, and
 `marks`. Parse errors have code `parse`; failed checks return empty bash.
-Additional `requires` and `environments` fields expose declarations. Optional
+Additional `requires` and `environments` fields expose declarations. `commands`
+lists distinct first command words in source order, after leading environment
+assignments and excluding diagram-defined functions. This is advisory metadata;
+it does not recursively parse arbitrary shell scripts. Optional
 `portable=True` enables the same advice as the CLI. It performs no file,
 process, network, or terminal I/O. The CLI uses this evaluation path.
 

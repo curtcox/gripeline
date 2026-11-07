@@ -1,0 +1,21 @@
+name: portable-t256-save
+spec: 14.5
+portable: true
+expect: contains
+=== dot ===
+digraph {
+  graph [gl_requires="printf t256" gl_env="linux macos windows apptron"];
+  hello [shape=box label="printf 'hello\\n'"];
+  saved [shape=note label="t256:"];
+  hello -> saved;
+}
+=== modl ===
+#gl requires printf t256
+#gl env linux macos windows apptron
+hello square printf 'hello\n'
+saved hex t256:
+hello -> saved
+=== bash ===
+printf 'hello\n' | t256 save -f t256 -
+=== stdout ===
+t256:AAAAAAAGaGVsbG8K

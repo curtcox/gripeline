@@ -43,3 +43,14 @@ test('oversized referenced content is rejected before a network fetch',async()=>
     await assert.rejects(apptronSnapshot('a square cat','modl','python',[cid]),/1 MiB/);
   }finally{globalThis.fetch=previous;}
 });
+test('environment declarations and missing tools determine available targets',async()=>{
+  const {classifyEnvironments}=await import('../src/environments.js');
+  const inventory={common:['printf','cat','t256'],environments:{linux:['python3'],macos:['python3'],windows:['py'],apptron:['python3']}};
+  let targets=classifyEnvironments({commands:['printf'],requires:['jq'],environments:['linux','apptron'],problems:[]},inventory,{apptronReady:true});
+  assert.equal(targets.linux.status,'needs');assert.deepEqual(targets.linux.missing,['jq']);
+  assert.equal(targets.apptron.status,'needs');assert.equal(targets.windows.status,'unsupported');
+  targets=classifyEnvironments({commands:['t256'],problems:[]},inventory,{apptronReady:true});
+  assert.equal(targets.apptron.status,'runs');
+  targets=classifyEnvironments({problems:[{code:'E02'}]},inventory,{apptronReady:true});
+  assert.ok(Object.values(targets).every(target=>target.status==='unsupported'));
+});

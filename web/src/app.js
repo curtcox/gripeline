@@ -1,9 +1,12 @@
+import {classifyEnvironments,nativeEnvironments} from './environments.js';
 import {mountWorkspace} from './workspace.js';
 import {renderDot} from './dot-render.js';
 import {renderModl} from './modl-render.js';
 import {shareLink,decode64,loadCID,unwrapDiagram} from './cid.js';
 import {localCommand,download,apptronSnapshot,apptronLink} from './run-targets.js';
 const $=id=>document.getElementById(id), source=$('source');
+const inventory=await(await fetch('portable-tools.json')).json();
+let targets={};
 let workspace,revision=0,loadRevision=0,timer,result=null,positions=Object.create(null),cid=null;
 const worker=new Worker(new URL('./transpile.js',import.meta.url),{type:'module'});
 const report=text=>{$('diagnostics').textContent=text;};
@@ -18,14 +21,15 @@ worker.onmessage=async({data})=>{
   result=data.result;$('bash').textContent=result.bash;
   $('status').textContent=result.problems.length?'Needs attention':`Checked · ${result.lang}`;
   report([...result.problems.map(p=>`${p.code}${p.line?' · line '+p.line:''}: ${p.message}`),...result.warnings].join('\n')||'Static checks passed. Review the bash before running.');
-  for(const id of ['local','download-bash'])$(id).disabled=!result.bash;
-  // The required VM overlay must be released before enabling this target.
-  $('apptron').disabled=true;$('apptron').title='Requires the gallery/gripeline overlay release in Apptron; see EDITOR_PLAN.md.';
+  targets=classifyEnvironments(result,inventory);
+  $('download-bash').disabled=!result.bash;
+  $('local').disabled=!result.bash||!nativeEnvironments.some(environment=>targets[environment].status!=='unsupported');
+  $('apptron').disabled=true;$('apptron').title=targets.apptron.reason;
   $('badges').replaceChildren();
-  for(const environment of ['linux','macos','windows','apptron']){
-    const badge=document.createElement('span'), supported=!result.environments.length||result.environments.includes(environment);
-    badge.textContent=`${environment} · ${!supported?'not supported':result.requires.length?'needs '+result.requires.join(', '):'tool availability not declared'}`;
-    $('badges').append(badge);
+  for(const [environment,target] of Object.entries(targets)){
+    const badge=document.createElement('span');
+    badge.textContent=`${environment} · ${target.status==='needs'?'needs '+target.missing.join(', '):target.status==='unsupported'?'not supported':'runs'}`;
+    badge.title=target.reason||inventory.assumptions;$('badges').append(badge);
   }
   try{
     $('diagram-note').textContent=result.lang==='dot'?'Graphviz layout':'Drag nodes to arrange';
@@ -36,7 +40,11 @@ worker.onmessage=async({data})=>{
 $('share').onclick=async()=>{try{const url=shareLink(source.value,positions);history.replaceState(null,'',url);await navigator.clipboard.writeText(url);$('status').textContent='Share link copied';}catch(error){report(error.message);}};
 $('download-source').onclick=()=>download(source.value,'pipeline.'+(result?.lang||$('language').value||'modl'));
 $('download-bash').onclick=()=>{if(result?.bash)download(result.bash,'pipeline.sh');};
-$('local').onclick=()=>{if(!result?.bash)return;$('review').textContent=result.bash;$('command').value=localCommand(source.value,positions,cid);$('run-dialog').showModal();};
+const platform=(navigator.userAgentData?.platform||navigator.platform||'').toLowerCase();
+$('run-environment').value=platform.includes('win')?'windows':platform.includes('mac')?'macos':'linux';
+function updateLocalTarget(){const target=targets[$('run-environment').value];$('copy').disabled=target?.status==='unsupported';$('run-target-note').textContent=target?.reason||(target?.missing.length?'Additional tools required: '+target.missing.join(', ')+'. ':'')+inventory.assumptions;}
+$('run-environment').onchange=updateLocalTarget;
+$('local').onclick=()=>{if(!result?.bash)return;$('review').textContent=result.bash;$('command').value=localCommand(source.value,positions,cid);updateLocalTarget();$('run-dialog').showModal();};
 $('close').onclick=()=>$('run-dialog').close();$('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('command').value);$('copy').textContent='Copied';}catch(error){report(error.message);}};
 // Prepared for the pinned overlay release; links never execute automatically.
 $('apptron').onclick=async()=>{if(!result?.bash)return;const popup=window.open('about:blank','_blank');if(popup)popup.opener=null;try{const python=await(await fetch('gripeline.py')).text();const snapshot=await apptronSnapshot(source.value,result.lang,python,result.cids);const link=await apptronLink(snapshot);if(popup)popup.location=link;}catch(error){popup?.close();report(error.message);}};
