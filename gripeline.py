@@ -2444,7 +2444,7 @@ def read_input_source(path: str) -> str:
         return sys.stdin.read()
     if is_url_arg(path):
         return decode_share_link(path)
-    if path.startswith('t256:') or (not os.path.exists(path) and looks_like_cid(path)):
+    if path.startswith('t256:') or looks_like_cid(path):
         return load_cid(path)
     with open(path, encoding='utf-8', newline="") as f:
         return f.read()

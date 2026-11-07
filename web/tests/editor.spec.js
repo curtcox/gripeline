@@ -1,3 +1,6 @@
+import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+import LZString from '../vendor/lz-string.mjs';
 import {test,expect} from '@playwright/test';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -8,7 +11,7 @@ test('every fixture has identical bash in the worker and CLI',async({page})=>{
   const fixtures=JSON.parse(execFileSync('python3',['-c',`import sys,json; from pathlib import Path; sys.path.insert(0,'tests'); import run; print(json.dumps([{'src':getattr(c,l),'lang':l} for p in sorted(Path('tests/cases').rglob('*.case')) for c in [run.parse_case(p)] for l in ['dot','modl'] if getattr(c,l)]))`],{cwd:root,encoding:'utf8'}));
   const browserResults=await page.evaluate(async fixtures=>{
     const worker=new Worker('/editor/src/transpile.js',{type:'module'}), pending=new Map();
-    worker.onmessage=({data})=>pending.get(data.id)(data);
+    worker.onmessage=({data})=>{if(data.type!=='compiler')pending.get(data.id)(data);};
     const results=[];
     for(const [id,fixture] of fixtures.entries())results.push(await new Promise(resolve=>{pending.set(id,resolve);worker.postMessage({id,...fixture,portable:false});}));
     worker.terminate();return results;
@@ -111,4 +114,27 @@ test('environment declarations gate local commands and show missing tools',async
   await page.locator('#run-environment').selectOption('linux');
   await expect(page.getByRole('button',{name:'Copy command',exact:true})).toBeEnabled();
   await expect(page.locator('#run-target-note')).toContainText('jq');
+});
+
+test.describe('verified Apptron handoff',()=>{
+ test.use({serviceWorkers:'block'});
+ test('snapshot includes the exact checked compiler and never auto-runs',async({page,context})=>{
+  const commit='a'.repeat(40),overlay='c'.repeat(64),manifest=JSON.stringify({commit,securityVersion:1,files:{'overlays/gripeline.tar.gz':{sha256:overlay}}});
+  const manifestSha256=createHash('sha256').update(manifest).digest('hex');
+  const pin={version:1,baseUrl:'https://curtcox.github.io/apptron/',commit,release:'runtime-test',manifestSha256,overlaySha256:overlay};
+  await page.route('**/editor/apptron-runtime.json',route=>route.fulfill({json:pin}));
+  await page.route('https://curtcox.github.io/apptron/runtime.lock',route=>route.fulfill({json:{commit,release:pin.release,manifestSha256},headers:{'Access-Control-Allow-Origin':'*'}}));
+  await page.route(`https://curtcox.github.io/apptron/runtime/${commit}/runtime.json`,route=>route.fulfill({body:manifest,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'}}));
+  await context.route('https://curtcox.github.io/apptron/?compressed=*',route=>route.fulfill({body:'<p>Press Run in Apptron</p>',contentType:'text/html'}));
+  await page.goto('/editor/');
+  await page.getByLabel('Diagram source').fill('a square echo apptron');
+  const button=page.getByRole('button',{name:'Run in Apptron',exact:true});await expect(button).toBeEnabled();
+  const popupPromise=page.waitForEvent('popup');await button.click();const popup=await popupPromise;
+  await popup.waitForURL('https://curtcox.github.io/apptron/?compressed=*');
+  const snapshot=LZString.decompressFromEncodedURIComponent(new URL(popup.url()).searchParams.get('compressed'));
+  expect(snapshot).toContain('-- pipeline.modl --\na square echo apptron\n');
+  expect(snapshot).toContain('-- gripeline.py --\n'+readFileSync(path.join(root,'gripeline.py'),'utf8'));
+  expect(snapshot).toContain('check pipeline.modl');expect(snapshot).not.toMatch(/^python3 gripeline.py run/m);
+  expect(await popup.evaluate(()=>window.opener===null)).toBe(true);
+ });
 });

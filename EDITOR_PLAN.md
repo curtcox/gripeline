@@ -1,28 +1,26 @@
 # Editor and run-anywhere plan
 
-Status: **implementation in progress** (2026-11-07). Compiler and editor changes
-are pushed to Pages; t256 v0.1.0 is released. This implementation does not yet meet every phase's acceptance
-criteria.
+Status: **implementation in progress** (2026-11-07). Compiler, editor, native
+installers and the Apptron overlay are committed and pushed. t256 v0.1.0 and
+the immutable Apptron runtime are released. HashBin publishing and dedicated
+hosting remain in progress; GitHub Pages currently has a stale deployment lock.
 
 | phase | current implementation | remaining acceptance work |
 |---|---|---|
-| 0 | Pure API shared by CLI and worker; stdin/CID input; envelope unwrapping; Bash discovery; Windows launchers/installers; 3-OS CI matrix | CI passes on Linux, macOS and Windows. Native macOS CID execution verified with the checksummed t256 release; verify the Windows installer/run round trip |
-| 1 | Four-pane responsive editor; self-hosted Pyodide; Graphviz; vendored modl parser/layout; draggable SVG preview; live checks and marks; h1 links; reviewed local command; downloads; fixture gallery; Chromium fixture/API parity tests | Shared renderer extracted and pushed to modl; pinned renderer consumed by editor. Fragment Kit shell, mobile tabs, sharing, QR, explicit unverified draft recovery and verified offline reload are implemented. Chromium passes; Firefox/WebKit not yet run |
-| 2 | t256 producers/sinks, canonical CID validation, guard, E14, twin fixtures and spec | No remaining local compiler work identified |
-| 3 | Tested txtar builder, exact compiler embedding, local t256 configuration/store embedding, CID verification, compression and size/delimiter guards | t256 v0.1.0 published with a verified linux/386 binary. Apptron overlay, binary pin, release-input fingerprints and boot test are being implemented. Still needed: Apptron runtime release and real VM boot test. Run in Apptron is deliberately disabled until these exist |
-| 4 | Verified CID load and CID-based local command generation | HashBin Publish registration and save UI; dedicated origin and canonical/mirror migration; native round-trip on all OSes |
-| 5 | requires/env syntax, missing-tool guards, --portable advice, conservative declaration badges | Command inventories, per-platform missing-tool badges and excluded-target disabling are implemented. Three portable t256 twins pass on native macOS; the CI matrix now verifies baseline tools, native binaries, saved-envelope execution and tamper rejection. Linux/Windows follow-up and VM gallery checks are pending |
+| 0 | Pure API, stdin/CID inputs, Windows Bash discovery, installers and launchers | Linux, macOS and Windows CI pass, including native CID round trips and Windows installer execution |
+| 1 | Responsive editor, real Python worker, shared modl renderer, Graphviz, review dialog, share/QR, draft recovery, verified offline cache | Chromium and WebKit pass locally; Linux CI now covers Firefox too. Updated Pages deployment is externally blocked |
+| 2 | t256 producers/sinks, canonical CID validation, guard, E14, twin fixtures and spec | Complete |
+| 3 | Verified linux/386 t256, released overlay, exact checked compiler and local CID store in inert txtar handoff | Nine real VM boot tests and four origin-isolation tests pass. All six portable gallery executions pass in the VM. Verify public hosting and enable the pinned runtime when available |
+| 4 | Verified CID loading, typed modl envelopes, CID-based local commands | HashBin Publish registration and save UI; dedicated origin and migration. The current HashBin owned-app tool has been located upstream |
+| 5 | requires/env, missing-tool guards, --portable advice, command inventories and environment badges | All three native CI platforms and the real Apptron VM pass the portable gallery, local saved-envelope execution and tamper rejection |
 
-Verification: `make check` (89 fixtures, 45 unit tests), site build, vendored
-asset verification, 6 Node contract tests and 8 Chromium Playwright tests. Modl
-passes 33 unit tests, native Chromium zoom/drag/export checks and all 17 shared
-Fragment Kit contracts.
-Graphviz and sibling modl parity tools were available locally. The browser
-suite checks every fixture against Python, plus errors, reviewed commands,
-links that do not execute, and a 390px viewport. Other browsers have not been run. CI now covers all three operating systems.
-
-Continue with the upstream runtime releases and renderer extraction before
-claiming the complete run-anywhere plan is done.
+Verification: `make check` (89 fixtures, 47 unit tests), site build, vendored
+asset verification, 9 Node contract tests and 18 browser tests (9 each in
+Chromium/WebKit). Graphviz and sibling modl parity tools were available locally;
+no optional checks skipped. Firefox fails to start on this Mac before loading
+an application; the Linux browser job verifies it independently. Modl passes
+33 unit tests, native Chromium zoom/drag/export checks and all 17 shared
+Fragment Kit contracts. Apptron passes 36 unit tests and its build checks.
 
 Goal: the gripeline site lets you **construct, view, and run** gripeline
 diagrams.
@@ -291,8 +289,7 @@ Phases 0 and the modl renderer extraction can proceed in parallel. Phases 2 and
 ## 9. Open questions
 
 1. **`gripeline.hashbin.page`**: is that the right name, and is the HashBin
-   owned-app deploy tool available for a new app? It isn't in the local
-   `hashbin.org` checkout.
+   owned-app deploy tool available for a new app? The current upstream `hashbin.org` checkout provides it; the older local checkout did not.
 2. **Is the modl renderer extraction acceptable in modl**, or should gripeline
    vendor `editor.js` and drive it through `globalThis.ModlApp`? The second
    avoids a modl change but makes the editor modl's UI plus extras rather than

@@ -17,7 +17,7 @@ For optional browser tests (Node development tools only):
 python3 site/build.py
 cd web
 npm ci
-npx playwright install chromium
+npx playwright install chromium firefox webkit
 npm test
 ```
 
@@ -25,7 +25,8 @@ Drafts are saved locally and recovered only through an explicit Resume action.
 Recovered drafts are marked unverified; links never automatically restore them.
 The editor stores no credentials, execution commands, or relay configuration.
 Explicit links are checked before enabling local execution commands; opening
-one never runs a pipeline. CID loads verify length and SHA-512 before decoding.
+one never runs a pipeline. CID loads verify length and SHA-512 before decoding, reject documents over
+1 MiB before fetching, and bound streamed responses by the declared length.
 Bash must be reviewed in the local-run dialog before copying its command.
 
 `src/modl-render.js` embeds modl's standalone `renderDiagram` from pinned,
@@ -34,6 +35,7 @@ links use safe HTTP(S) navigation. The Fragment Kit shell supplies mobile tabs,
 sharing, QR, draft recovery and verified offline caching. The site builder
 includes only public editor assets and generates the offline hash manifest.
 
-The Apptron target remains disabled until the required overlay's runtime
-release passes its real VM boot check. HashBin publishing and canonical-origin
+The Apptron runtime has passed the real VM boot check and all six portable
+gallery executions. The editor verifies the deployed runtime lock, manifest
+and overlay before enabling handoff, and embeds the exact checked compiler. HashBin publishing and canonical-origin
 migration still require app registration. See `../EDITOR_PLAN.md` for status.

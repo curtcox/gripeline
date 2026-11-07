@@ -1,43 +1,48 @@
 [
   {
     "repo": "https://github.com/pyodide/pyodide",
-    "commit": "0.27.7",
+    "commit": "8250fdc3dc7bfd587fd8f4cc267e173095c58445",
     "path": "pyodide.mjs",
     "url": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.mjs",
     "target": "pyodide/pyodide.mjs",
-    "sha256": "04c052c815abb0bf2981fa38c2dfa58e3120ee5288c956df2b2a15e301782c5f"
+    "sha256": "04c052c815abb0bf2981fa38c2dfa58e3120ee5288c956df2b2a15e301782c5f",
+    "version": "0.27.7"
   },
   {
     "repo": "https://github.com/pyodide/pyodide",
-    "commit": "0.27.7",
+    "commit": "8250fdc3dc7bfd587fd8f4cc267e173095c58445",
     "path": "pyodide.asm.js",
     "url": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.asm.js",
     "target": "pyodide/pyodide.asm.js",
-    "sha256": "6b4c90de5b7172873f04f21884d0e9d2274e305fe32116558fe3e4fbe3618d51"
+    "sha256": "6b4c90de5b7172873f04f21884d0e9d2274e305fe32116558fe3e4fbe3618d51",
+    "version": "0.27.7"
   },
   {
     "repo": "https://github.com/pyodide/pyodide",
-    "commit": "0.27.7",
+    "commit": "8250fdc3dc7bfd587fd8f4cc267e173095c58445",
     "path": "pyodide.asm.wasm",
     "url": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.asm.wasm",
     "target": "pyodide/pyodide.asm.wasm",
-    "sha256": "a50dd1843f805a0b7c45b61037ee0d7b26dfe85efe0e18ef95a34ad24e401f5f"
+    "sha256": "a50dd1843f805a0b7c45b61037ee0d7b26dfe85efe0e18ef95a34ad24e401f5f",
+    "version": "0.27.7"
   },
   {
     "repo": "https://github.com/pyodide/pyodide",
-    "commit": "0.27.7",
+    "commit": "8250fdc3dc7bfd587fd8f4cc267e173095c58445",
     "path": "python_stdlib.zip",
     "url": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/python_stdlib.zip",
     "target": "pyodide/python_stdlib.zip",
-    "sha256": "16611534726e5d8ac2bd8f926410b2dcb8d6f49aa24913463533b457a2115c16"
+    "sha256": "16611534726e5d8ac2bd8f926410b2dcb8d6f49aa24913463533b457a2115c16",
+    "version": "0.27.7"
   },
   {
     "repo": "https://github.com/pyodide/pyodide",
-    "commit": "0.27.7",
+    "commit": "8250fdc3dc7bfd587fd8f4cc267e173095c58445",
     "path": "pyodide-lock.json",
     "url": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide-lock.json",
     "target": "pyodide/pyodide-lock.json",
-    "sha256": "9c45b916001a750f4102fc287494f3eab215909c7535c626a20db80fd6333e2c"
+    "sha256": "9c45b916001a750f4102fc287494f3eab215909c7535c626a20db80fd6333e2c",
+    "version": "0.27.7"
   },
   {
     "repo": "https://github.com/mdaines/viz-js",
@@ -82,11 +87,12 @@
   },
   {
     "repo": "https://github.com/pyodide/pyodide",
-    "commit": "0.27.7",
+    "commit": "8250fdc3dc7bfd587fd8f4cc267e173095c58445",
     "path": "LICENSE",
     "url": "https://raw.githubusercontent.com/pyodide/pyodide/0.27.7/LICENSE",
     "target": "pyodide/LICENSE",
-    "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+    "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+    "version": "0.27.7"
   },
   {
     "repo": "https://github.com/mdaines/viz-js",

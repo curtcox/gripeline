@@ -1,3 +1,4 @@
+import {checkApptronRuntime} from './apptron-runtime.js';
 import {classifyEnvironments,nativeEnvironments} from './environments.js';
 import {mountWorkspace} from './workspace.js';
 import {renderDot} from './dot-render.js';
@@ -5,8 +6,8 @@ import {renderModl} from './modl-render.js';
 import {shareLink,decode64,loadCID,unwrapDiagram} from './cid.js';
 import {localCommand,download,apptronSnapshot,apptronLink} from './run-targets.js';
 const $=id=>document.getElementById(id), source=$('source');
-const inventory=await(await fetch('portable-tools.json')).json();
-let targets={};
+const [inventory,apptronPin]=await Promise.all(['portable-tools.json','apptron-runtime.json'].map(async path=>(await fetch(path)).json()));
+let targets={},compilerSource=null,apptronState={ready:false,reason:'Checking Apptron availability…'};
 let workspace,revision=0,loadRevision=0,timer,result=null,positions=Object.create(null),cid=null;
 const worker=new Worker(new URL('./transpile.js',import.meta.url),{type:'module'});
 const report=text=>{$('diagnostics').textContent=text;};
@@ -16,27 +17,32 @@ function edited(){loadRevision++;cid=null;workspace?.saveDraft();invalidate();$(
 source.addEventListener('input',edited);$('language').onchange=edited;$('portable').onchange=edited;
 worker.onerror=event=>{invalidate();$('status').textContent='Runtime unavailable';report(event.message);};
 worker.onmessage=async({data})=>{
+  if(data.type==='compiler'){compilerSource=data.source;return;}
   if(data.id!==revision)return;
   if(data.error){$('status').textContent='Runtime unavailable';report(data.error);return;}
   result=data.result;$('bash').textContent=result.bash;
   $('status').textContent=result.problems.length?'Needs attention':`Checked · ${result.lang}`;
   report([...result.problems.map(p=>`${p.code}${p.line?' · line '+p.line:''}: ${p.message}`),...result.warnings].join('\n')||'Static checks passed. Review the bash before running.');
-  targets=classifyEnvironments(result,inventory);
-  $('download-bash').disabled=!result.bash;
-  $('local').disabled=!result.bash||!nativeEnvironments.some(environment=>targets[environment].status!=='unsupported');
-  $('apptron').disabled=true;$('apptron').title=targets.apptron.reason;
-  $('badges').replaceChildren();
-  for(const [environment,target] of Object.entries(targets)){
-    const badge=document.createElement('span');
-    badge.textContent=`${environment} · ${target.status==='needs'?'needs '+target.missing.join(', '):target.status==='unsupported'?'not supported':'runs'}`;
-    badge.title=target.reason||inventory.assumptions;$('badges').append(badge);
-  }
+  refreshTargets();
   try{
     $('diagram-note').textContent=result.lang==='dot'?'Graphviz layout':'Drag nodes to arrange';
     const diagram=result.lang==='dot'?await renderDot(source.value,result.marks):renderModl(source.value,positions,result.marks,()=>workspace?.saveDraft());
     if(data.id===revision)$('diagram').replaceChildren(diagram);
   }catch(error){if(data.id===revision)$('diagram').textContent='Preview: '+error.message;}
 };
+function refreshTargets(){if(!result)return;
+  targets=classifyEnvironments(result,inventory,{apptronReady:apptronState.ready,apptronReason:apptronState.reason});
+  $('download-bash').disabled=!result.bash;
+  $('local').disabled=!result.bash||!nativeEnvironments.some(environment=>targets[environment].status!=='unsupported');
+  $('apptron').disabled=targets.apptron.status!=='runs';$('apptron').title=targets.apptron.reason||(targets.apptron.missing.length?'Additional VM tools required: '+targets.apptron.missing.join(', '):apptronState.reason);
+  $('badges').replaceChildren();
+  for(const [environment,target] of Object.entries(targets)){
+    const badge=document.createElement('span');
+    badge.textContent=`${environment} · ${target.status==='needs'?'needs '+target.missing.join(', '):target.status==='unsupported'?'not supported':'runs'}`;
+    badge.title=target.reason||inventory.assumptions;$('badges').append(badge);
+  }
+}
+void checkApptronRuntime(apptronPin).then(state=>{apptronState=state;refreshTargets();});
 $('share').onclick=async()=>{try{const url=shareLink(source.value,positions);history.replaceState(null,'',url);await navigator.clipboard.writeText(url);$('status').textContent='Share link copied';}catch(error){report(error.message);}};
 $('download-source').onclick=()=>download(source.value,'pipeline.'+(result?.lang||$('language').value||'modl'));
 $('download-bash').onclick=()=>{if(result?.bash)download(result.bash,'pipeline.sh');};
@@ -46,8 +52,14 @@ function updateLocalTarget(){const target=targets[$('run-environment').value];$(
 $('run-environment').onchange=updateLocalTarget;
 $('local').onclick=()=>{if(!result?.bash)return;$('review').textContent=result.bash;$('command').value=localCommand(source.value,positions,cid);updateLocalTarget();$('run-dialog').showModal();};
 $('close').onclick=()=>$('run-dialog').close();$('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('command').value);$('copy').textContent='Copied';}catch(error){report(error.message);}};
-// Prepared for the pinned overlay release; links never execute automatically.
-$('apptron').onclick=async()=>{if(!result?.bash)return;const popup=window.open('about:blank','_blank');if(popup)popup.opener=null;try{const python=await(await fetch('gripeline.py')).text();const snapshot=await apptronSnapshot(source.value,result.lang,python,result.cids);const link=await apptronLink(snapshot);if(popup)popup.location=link;}catch(error){popup?.close();report(error.message);}};
+// Capture the reviewed source and the exact compiler loaded by the worker.
+$('apptron').onclick=async()=>{
+  if(!result?.bash||!compilerSource||!apptronState.ready||targets.apptron.status!=='runs')return;
+  const reviewed={src:source.value,lang:result.lang,cids:[...result.cids],compiler:compilerSource};
+  const popup=window.open('about:blank','_blank');if(!popup){report('Allow a new tab to open Apptron.');return;}popup.opener=null;
+  try{const snapshot=await apptronSnapshot(reviewed.src,reviewed.lang,reviewed.compiler,reviewed.cids);popup.location=await apptronLink(snapshot);}
+  catch(error){popup.close();report(error.message);}
+};
 async function loadHash(){
   const loading=++loadRevision;
   if(!location.hash)return;

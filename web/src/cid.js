@@ -1,3 +1,4 @@
+import {readResponse} from '../vendor/fragment-kit-v0.3.4/src/core/bytes.js';
 export const encode64 = bytes => { let s=''; for(const b of bytes)s+=String.fromCharCode(b); return btoa(s).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,''); };
 export const decode64 = text => Uint8Array.from(atob(text.replaceAll('-','+').replaceAll('_','/')+'='.repeat((4-text.length%4)%4)), c=>c.charCodeAt(0));
 export function parseCID(reference) {
@@ -8,12 +9,13 @@ export function parseCID(reference) {
   if(encode64(payload)!==cid.slice(8)||payload.length!==(length<=64?length:64))throw Error('Invalid CID length or padding');
   return {cid,length,payload};
 }
-export async function loadCID(reference) {
+export async function loadCID(reference,maxBytes=1048576) {
   const {cid,length,payload}=parseCID(reference);
+  if(length>maxBytes)throw Error('CID content exceeds the editor byte limit');
   if(length<=64)return payload;
   const response=await fetch('https://256t.us/'+cid);
   if(!response.ok)throw Error('CID load failed: '+response.status);
-  const data=new Uint8Array(await response.arrayBuffer());
+  const data=await readResponse(response,Math.min(length,maxBytes));
   if(data.length!==length||encode64(new Uint8Array(await crypto.subtle.digest('SHA-512',data)))!==cid.slice(8))throw Error('CID verification failed');
   return data;
 }
@@ -22,7 +24,7 @@ export function unwrapDiagram(text) {
   if(typeof value?.src!=='string')throw Error('Saved diagram must contain source text');
   if(value.format&&value.format!=='hashbin-diagram'||value.version!==undefined&&value.version!==1)throw Error('Unsupported diagram envelope');
   const pos=Object.create(null);
-  for(const [key,pair] of Object.entries(value.pos??{})) {
+  for(const [key,pair] of Object.entries(value.modl?.pos??value.pos??{})) {
     if(!Array.isArray(pair)||pair.length!==2||!pair.every(Number.isFinite))throw Error('Invalid diagram position');
     pos[key]=pair;
   }

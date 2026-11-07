@@ -54,3 +54,30 @@ test('environment declarations and missing tools determine available targets',as
   targets=classifyEnvironments({problems:[{code:'E02'}]},inventory,{apptronReady:true});
   assert.ok(Object.values(targets).every(target=>target.status==='unsupported'));
 });
+test('Apptron is enabled only for the pinned manifest and overlay',async()=>{
+  const {checkApptronRuntime}=await import('../src/apptron-runtime.js');
+  const commit='a'.repeat(40),overlay='c'.repeat(64),raw=JSON.stringify({commit,securityVersion:1,files:{'overlays/gripeline.tar.gz':{sha256:overlay}}});
+  const manifestSha256=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw))).toString('hex');
+  const pin={version:1,baseUrl:'https://curtcox.github.io/apptron/',commit,release:'runtime-test',manifestSha256,overlaySha256:overlay};
+  let lock={commit,release:pin.release,manifestSha256},manifest=raw;
+  const fetcher=async url=>new Response(url.endsWith('runtime.lock')?JSON.stringify(lock):manifest);
+  assert.equal((await checkApptronRuntime(pin,{fetcher})).ready,true);
+  lock={...lock,release:'older-runtime'};assert.equal((await checkApptronRuntime(pin,{fetcher})).ready,false);
+  lock={...lock,release:pin.release};manifest=raw+' ';assert.equal((await checkApptronRuntime(pin,{fetcher})).ready,false);
+  assert.equal((await checkApptronRuntime({...pin,baseUrl:'https://untrusted.example/'},{fetcher})).ready,false);
+});
+test('CID loading rejects oversized declarations before fetching and bounds response bytes',async()=>{
+  const previous=globalThis.fetch;
+  try{
+    globalThis.fetch=async()=>{throw Error('unexpected network fetch');};
+    const oversized=encode64(new Uint8Array([0,0,0,32,0,0]))+encode64(new Uint8Array(64));
+    await assert.rejects(loadCID(oversized),/limit/);
+    const declared=encode64(new Uint8Array([0,0,0,0,0,70]))+encode64(new Uint8Array(64));
+    globalThis.fetch=async()=>new Response(new Uint8Array(100));
+    await assert.rejects(loadCID(declared),/limit/);
+  }finally{globalThis.fetch=previous;}
+});
+test('current typed modl envelopes retain their fractional positions',()=>{
+  const loaded=unwrapDiagram(JSON.stringify({format:'hashbin-diagram',version:1,type:'modl',src:'a square cat',modl:{pos:{a:[1.25,2.5]}}}));
+  assert.deepEqual(loaded.pos.a,[1.25,2.5]);
+});

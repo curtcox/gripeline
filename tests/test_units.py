@@ -517,6 +517,21 @@ class EditorPrerequisites(unittest.TestCase):
         self.assertEqual(result['commands'], ['printf'])
         self.assertEqual(result['warnings'], [])
 
+    def test_bare_cid_cannot_be_shadowed_by_a_local_file(self):
+        from unittest.mock import patch
+        with patch('gripeline.os.path.exists', return_value=True), patch(
+            'gripeline.load_cid', return_value='a square echo verified'
+        ) as load, patch('builtins.open', side_effect=AssertionError('unverified file read')):
+            self.assertEqual(gl.read_input_source('AAAAAAAA'), 'a square echo verified')
+        load.assert_called_once_with('AAAAAAAA')
+
+    def test_explicit_path_to_cid_named_file_is_literal(self):
+        from unittest.mock import patch
+        with patch('gripeline.load_cid', side_effect=AssertionError('unexpected CID load')), patch(
+            'builtins.open', return_value=io.StringIO('a square echo local')
+        ):
+            self.assertEqual(gl.read_input_source('./AAAAAAAA'), 'a square echo local')
+
     def test_api_does_no_io(self):
         from unittest.mock import patch
         with patch('builtins.open', side_effect=AssertionError('I/O')), patch(

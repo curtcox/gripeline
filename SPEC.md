@@ -1418,7 +1418,9 @@ HTTP(S) link whose fragment is a CID) invoke `t256 load CID`; verification is
 performed by t256. A hashbin-diagram JSON envelope with version 1 is unwrapped.
 Inline `#h1=` links remain supported, without t256. URL inputs now sniff source
 language, allowing dot as well as modl links; `--lang` overrides detection.
-Missing t256 or malformed inputs exit 2. `run` uses `GRIPELINE_BASH`, then Bash
+Bare valid CIDs always go through verified loading, even if a same-named file
+exists in the current directory. Use an explicit path such as `./CID` to read
+a literal local file instead. Missing t256 or malformed inputs exit 2. `run` uses `GRIPELINE_BASH`, then Bash
 on PATH, then Git for Windows installation locations. The Windows WSL launcher
 is rejected; run gripeline inside WSL instead. Scripts use temporary files so
 pipeline stdin remains available. Generated temporary scripts use UTF-8 and LF

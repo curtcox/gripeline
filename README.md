@@ -112,7 +112,9 @@ portable operations `load` (instead of curl/wget/Invoke-WebRequest), `cid` and
 `verify` (instead of sha256sum/shasum/certutil), and `save` (instead of ad-hoc
 uploads). CID syntax and content verification use t256's SHA-512 identifiers.
 
-The Apptron target remains disabled until its gripeline overlay is released.
+The Apptron target verifies its pinned runtime manifest and gripeline overlay before
+enabling a handoff. The snapshot includes the exact compiler that checked the source;
+opening it performs a static check and offers a command to run explicitly.
 HashBin publishing and a canonical dedicated origin require external app
 registration. See [EDITOR_PLAN.md](EDITOR_PLAN.md) for current phase status.
 

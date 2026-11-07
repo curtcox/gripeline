@@ -4,7 +4,9 @@ const ready = (async () => {
   const py = await loadPyodide({indexURL: new URL('../vendor/pyodide/', import.meta.url).href});
   const response = await fetch(new URL('../gripeline.py', import.meta.url));
   if (!response.ok) throw Error('Unable to load gripeline.py');
-  py.FS.writeFile('/gripeline.py', await response.text());
+  const compiler=await response.text();
+  py.FS.writeFile('/gripeline.py', compiler);
+  self.postMessage({type:'compiler',source:compiler});
   await py.runPythonAsync('import sys; sys.path.insert(0, "/"); from gripeline import gripeline_api; import json');
   return py;
 })();
