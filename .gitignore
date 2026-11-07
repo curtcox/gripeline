@@ -7,3 +7,6 @@ __pycache__/
 
 # Agent-local settings
 .claude/settings.local.json
+web/node_modules/
+web/test-results/
+web/playwright-report/

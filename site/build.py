@@ -26,6 +26,7 @@ diagrams degrade to a "source only" note.
 from __future__ import annotations
 
 import html
+import json
 import os
 import re
 import shutil
@@ -80,9 +81,9 @@ def render_dot_svg(src: str) -> str | None:
     return svg[i:] if i != -1 else None
 
 
-def diagram_block(src: str, *, with_source: bool = True) -> str:
+def diagram_block(src: str, *, with_source: bool = True, editor_base="editor/") -> str:
     """HTML for a dot snippet: optional source plus its rendered SVG."""
-    parts = []
+    parts = [f'<a href="{html.escape(gl_mod.encode_share_link(src, editor_base), quote=True)}">Edit in gripeline</a>']
     if with_source:
         parts.append(
             '<div class="dot-source"><div class="label">dot source</div>'
@@ -116,7 +117,7 @@ def highlight_modl_line(line: str) -> str:
     return escaped
 
 
-def modl_block(src: str) -> str:
+def modl_block(src: str, editor_base="editor/") -> str:
     """HTML for a modl snippet: highlighted source plus an 'Open in modl editor' link."""
     url = gl_mod.encode_share_link(src)
     highlighted = "\n".join(highlight_modl_line(l) for l in src.splitlines())
@@ -124,6 +125,7 @@ def modl_block(src: str) -> str:
         '<div class="modl-block">'
         '<div class="modl-header">'
         '<span class="label">modl source</span>'
+        f'<a href="{html.escape(gl_mod.encode_share_link(src, editor_base), quote=True)}">Edit in gripeline</a>'
         f'<a class="modl-open" href="{html.escape(url, quote=True)}" '
         'target="_blank" rel="noopener">Open in modl editor &#8599;</a>'
         "</div>"
@@ -561,9 +563,9 @@ def build_test_pages(out_dir: Path) -> dict:
         # the diagram(s)
         body.append("<h2>Diagram</h2>")
         if case.has_dot:
-            body.append(diagram_block(case.dot))
+            body.append(diagram_block(case.dot, editor_base="../editor/"))
         if case.has_modl:
-            body.append(modl_block(case.modl))
+            body.append(modl_block(case.modl, "../editor/"))
 
         # expectation
         if case.expect == "error":
@@ -668,6 +670,16 @@ def main(argv: list[str]) -> int:
     print(f"build: dot     -> {DOT_BIN or 'NOT FOUND (diagrams degrade)'}")
     print(f"build: gripeline -> {os.environ.get('GRIPELINE')}")
 
+    shutil.copytree(ROOT / 'web', out_dir / 'editor', dirs_exist_ok=True)
+    shutil.copyfile(ROOT / 'gripeline.py', out_dir / 'editor' / 'gripeline.py')
+    gallery = []
+    for path in sorted((TESTS_DIR / 'cases').rglob('*.case')):
+        case = harness.parse_case(path)
+        for lang in ('dot', 'modl'):
+            src = getattr(case, lang)
+            if src:
+                gallery.append(dict(name=case.name + ' (' + lang + ')', src=src, lang=lang))
+    (out_dir / 'editor' / 'gallery.json').write_text(json.dumps(gallery), encoding='utf-8')
     stats = build_test_pages(out_dir)
     build_spec_page(out_dir)
     build_index_page(out_dir, stats)

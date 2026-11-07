@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' https://256t.us; worker-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'">
+<title>gripeline · Editor</title><link rel="stylesheet" href="src/style.css"></head>
+<body><header><a href="../">gripeline<span> / editor</span></a><span id="status" role="status">Starting Python…</span><button id="share">Share link</button></header>
+<main><div class="intro"><div><p class="eyebrow">ONE DIAGRAM. ONE PIPELINE.</p><h1>Draw the flow.<br>Read the bash.</h1></div><p>Edit a diagram, inspect what it does, then choose where to run it. Your browser checks and renders; execution happens in your terminal.</p></div>
+<nav aria-label="Editor actions"><label>Example <select id="gallery"><option value="">Choose a pipeline</option></select></label><label>Language <select id="language"><option value="">Detect automatically</option><option>modl</option><option>dot</option></select></label><label><input id="portable" type="checkbox">Portability advice</label><button id="download-source">Download source</button><button id="download-bash" disabled>Download bash</button><button id="local" disabled>Run locally</button><button id="apptron" disabled>Run in Apptron</button></nav>
+<div id="badges" aria-label="Environments"></div>
+<div class="panels"><section><h2><span>01</span> Source</h2><textarea id="source" aria-label="Diagram source" spellcheck="false">hello square printf 'hello\n'
+count square wc -c
+hello -> count
+</textarea></section><section><h2><span>02</span> Diagram <small id="diagram-note"></small></h2><div id="diagram" aria-label="Rendered diagram"></div></section><section><h2><span>03</span> Bash <small>Review before running</small></h2><pre id="bash" tabindex="0"></pre></section><section><h2><span>04</span> Diagnostics</h2><div id="diagnostics" aria-live="polite">Loading the Python runtime for the first check…</div></section></div>
+</main><dialog id="run-dialog"><h2>Review, then run locally</h2><p>This command loads the diagram shown here. Execution starts only when you run the command in your terminal.</p><pre id="review"></pre><p>Works in bash, zsh, PowerShell, and cmd with gripeline installed:</p><textarea id="command" readonly aria-label="Local run command"></textarea><button id="copy">Copy command</button><button id="close">Close</button></dialog><script type="module" src="src/app.js"></script></body></html>

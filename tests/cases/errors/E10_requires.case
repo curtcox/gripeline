@@ -1,0 +1,11 @@
+name: E10-requires
+spec: 14.5
+expect: error
+code: E10
+=== dot ===
+digraph { graph [gl_requires="bad;command"]; a [label="echo hi"]; }
+=== modl ===
+#gl requires bad;command
+a square echo hi
+=== error ===
+invalid required tool

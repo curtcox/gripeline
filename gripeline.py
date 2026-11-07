@@ -9,6 +9,8 @@ CLI:
     gripeline build <file>         print transpiled bash to stdout
     gripeline run   <file>         transpile then exec under bash; propagate status
     gripeline check <file>         run only the §9 static check; exit 0 or 65
+        <file> may be - (stdin), a CID, t256:CID, or a share URL
+        --portable                warn about commands outside the portable set
         --lang=dot|modl            override language detection
         --annotate[=out]           also write a diagnostic-annotated copy
         --link                     with --annotate, print a review URL to stderr
@@ -19,6 +21,8 @@ import base64
 import json
 import os
 import re
+import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -907,6 +911,13 @@ class ModlParser:
             self.add_e10(f"line {lineno}: whole-line #gl edge is not supported; use a trailing pragma on the edge line")
             return
 
+        if head in ('requires', 'env'):
+            self.graph_attrs['gl_' + head] = ' '.join(tokens[1:])
+            return
+        if head == 't256' and len(tokens) == 1:
+            self.graph_attrs['gl_t256'] = 'true'
+            return
+
         # Graph-level pragma: #gl key=val ...
         try:
             pairs = _parse_kv_pairs(tokens, lineno)
@@ -1245,6 +1256,8 @@ class Engine:
         self.offending_edges: set[int] = set()
         self.synthetic_sources = {}
         self.prepared = False
+        self.uses_t256 = False
+        self.cids = []
 
     # ----- role & edge-kind resolution -----
     def optext(self, node: Node):
@@ -1315,6 +1328,26 @@ class Engine:
             self.resolve_roles()
             if self.mapping == "dataflow":
                 self.dataflow_transform()
+        for nd in self.nodes.values():
+            label = self.optext(nd)
+            if nd.role != 'file' or not (label.startswith('t256:') or
+                    self.graph_attrs.get('gl_t256') == 'true'):
+                continue
+            try:
+                cid = cid_reference(label) if label != 't256:' else None
+                if cid is None and any(e.tail == nd.id for e in self.edges):
+                    raise GripError('t256: sink cannot be a source')
+                if cid is not None and any(e.head == nd.id for e in self.edges):
+                    raise GripError('t256: source cannot be a sink')
+            except GripError as error:
+                self.problems.append(('E14', f'[E14] node "{nd.id}": {error}'))
+                self.offending_nodes.add(nd.id)
+                continue
+            self.uses_t256 = True
+            if cid is not None and cid not in self.cids:
+                self.cids.append(cid)
+            nd.role = 'program'
+            nd.attrs['label'] = 't256 load ' + cid if cid is not None else 't256 save -f t256 -'
         self.prepared = True
 
     # ----- static checks (§9) -----
@@ -1325,6 +1358,13 @@ class Engine:
             return self.problems  # nothing else meaningful
 
         self.prepare()
+
+        for tool in self.graph_attrs.get('gl_requires', '').split():
+            if not re.fullmatch(r'[a-zA-Z0-9_+.-]+', tool):
+                self.problems.append(('E10', '[E10] invalid required tool ' + repr(tool)))
+        for environment in self.graph_attrs.get('gl_env', '').split():
+            if environment not in ('linux', 'macos', 'windows', 'apptron'):
+                self.problems.append(('E10', '[E10] unknown environment ' + repr(environment)))
 
         # E02: program node with empty operation text
         for nd in self.nodes.values():
@@ -1601,6 +1641,14 @@ class Engine:
         out = []
         prologue = self.graph_attrs.get("gl_prologue", "set -euo pipefail")
         out.append(prologue)
+        if self.uses_t256:
+            out.append('command -v t256 >/dev/null || { echo "gripeline: t256 not found" >&2; exit 127; }')
+        required = self.graph_attrs.get('gl_requires', '').split()
+        if required:
+            out.append('_gripeline_missing=""')
+            for tool in required:
+                out.append(f'command -v {shlex.quote(tool)} >/dev/null || _gripeline_missing="$_gripeline_missing {tool}"')
+            out.append('[ -z "$_gripeline_missing" ] || { echo "gripeline: missing tools:$_gripeline_missing" >&2; exit 127; }')
 
         for cid, cl in sorted(self.clusters.items(), key=lambda kv: kv[1].order):
             if self.cluster_kind(cid) == "function":
@@ -2214,6 +2262,111 @@ def find_cycle(adj):
 # ==========================================================================
 # Share-link decoding & Front-end dispatcher
 # ==========================================================================
+def cid_reference(reference: str) -> str:
+    """Port of tools/t256/cid/cid.go Validate and suffix rules; no I/O."""
+    value = reference[5:] if reference.startswith('t256:') else reference
+    cid, dot, suffix = value.partition('.')
+    if dot and not re.fullmatch(r'[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*', suffix):
+        raise GripError('invalid t256 suffix')
+    if not 8 <= len(cid) <= 94 or not re.fullmatch(r'[A-Za-z0-9_-]+', cid):
+        raise GripError('invalid t256 CID alphabet or length')
+    try:
+        length = int.from_bytes(base64.urlsafe_b64decode(cid[:8]), 'big')
+        payload = base64.urlsafe_b64decode(cid[8:] + '=' * (-len(cid[8:]) % 4))
+    except ValueError as error:
+        raise GripError('invalid t256 CID base64url') from error
+    if base64.urlsafe_b64encode(payload).decode().rstrip('=') != cid[8:]:
+        raise GripError('invalid t256 CID padding bits')
+    if len(payload) != (length if length <= 64 else 64):
+        raise GripError('invalid t256 CID payload length')
+    return cid
+
+
+def looks_like_cid(value: str) -> bool:
+    try:
+        cid_reference(value)
+        return True
+    except GripError:
+        return False
+
+
+def load_cid(reference: str) -> str:
+    cid = cid_reference(reference)
+    executable = shutil.which('t256')
+    if not executable:
+        raise GripError('t256 not found; install t256 from https://256t.org to load CIDs')
+    result = subprocess.run([executable, 'load', cid], capture_output=True, text=True, encoding='utf-8')
+    if result.returncode:
+        raise GripError('t256 load failed: ' + result.stderr.strip())
+    try:
+        value = json.loads(result.stdout)
+    except ValueError:
+        return result.stdout
+    if isinstance(value, dict) and 'src' in value:
+        if value.get('format', 'hashbin-diagram') != 'hashbin-diagram' or value.get('version', 1) != 1:
+            raise GripError('unsupported hashbin-diagram envelope')
+        if not isinstance(value['src'], str):
+            raise GripError('hashbin-diagram src must be text')
+        return value['src']
+    return result.stdout
+
+
+def locate_bash() -> str:
+    candidate = os.environ.get('GRIPELINE_BASH') or shutil.which('bash')
+    wsl = bool(candidate and re.search(r'(?i)(?:^|[/\\])system32[/\\]bash(?:\.exe)?$', candidate))
+    if wsl:
+        if os.environ.get('GRIPELINE_BASH'):
+            raise GripError('WSL bash cannot run Windows temporary paths; use Git Bash or run gripeline inside WSL')
+        candidate = None
+    if candidate:
+        return candidate
+    for root in (os.environ.get('ProgramFiles'), os.environ.get('ProgramFiles(x86)'),
+                 os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs')):
+        if root:
+            candidate = os.path.join(root, 'Git', 'bin', 'bash.exe')
+            if os.path.isfile(candidate):
+                return candidate
+    if wsl:
+        raise GripError('Only WSL bash found; install Git Bash or run gripeline inside WSL')
+    raise GripError('bash not found; install Git for Windows or set GRIPELINE_BASH')
+
+
+PORTABLE_TOOLS = frozenset('echo printf cat tee sort uniq wc head tail cut tr sed grep awk find xargs test true false pwd cd mkdir rm cp mv touch basename dirname env sh bash t256'.split())
+
+
+def gripeline_api(src: str, lang: str | None = None, *, portable: bool = False) -> dict:
+    """Pure browser/CLI entry point. Never reads files, starts processes or exits."""
+    resolved = lang
+    try:
+        resolved = detect_lang(None, src, lang)
+        engine = Engine(parse_source(src, resolved))
+        problems = engine.run_checks()
+        warnings = list(engine.warnings)
+        if portable:
+            for nd in engine.nodes.values():
+                if nd.role in ('program', 'op', 'coproc'):
+                    try:
+                        words = shlex.split(engine.optext(nd))
+                    except ValueError:
+                        words = []
+                    if words and words[0] not in PORTABLE_TOOLS:
+                        warnings.append('portability: command ' + words[0] + ' is outside the portable set')
+        marks = sorted(engine.offending_nodes) + ['L' + str(n) for n in sorted(engine.offending_edges)]
+        details = []
+        for code, message in problems:
+            node = next((n for n in engine.nodes if '"' + n + '"' in message), None)
+            position = engine.nodes[node].pos if node else None
+            line = position if resolved == 'modl' else (src.count('\n', 0, position) + 1 if position is not None else None)
+            details.append(dict(code=code, message=message, line=line, node=node))
+        return dict(lang=resolved, bash='' if problems else engine.transpile(),
+                    problems=details, warnings=warnings, marks=marks,
+                    cids=engine.cids, requires=engine.graph_attrs.get('gl_requires', '').split(),
+                    environments=engine.graph_attrs.get('gl_env', '').split())
+    except GripError as error:
+        return dict(lang=resolved, bash='', problems=[dict(code='parse', message=str(error), line=None, node=None)],
+                    warnings=[], marks=[], cids=[], requires=[], environments=[])
+
+
 def is_url_arg(arg: str) -> bool:
     return arg.startswith(("http://", "https://"))
 
@@ -2232,9 +2385,8 @@ def decode_share_link(url: str) -> str:
         except Exception as e:
             raise GripError(f"invalid #h1 share link payload: {e}")
         raise GripError("invalid #h1 share link: missing 'src' field")
-    raise GripError(
-        "256t CID share links require network access to HashBin; use an #h1= inline share link"
-    )
+    return load_cid(frag)
+
 
 
 def encode_share_link(src: str, base_url: str = "https://modl.hashbin.page/") -> str:
@@ -2249,8 +2401,7 @@ def detect_lang(path: str | None, src: str, lang: str | None = None) -> str:
             raise GripError(f"unknown language {lang!r}")
         return lang
     if path:
-        if is_url_arg(path):
-            return "modl"
+
         ext = os.path.splitext(path)[1].lower()
         if ext == ".modl":
             return "modl"
@@ -2280,9 +2431,13 @@ def parse_source(src: str, lang: str = "dot") -> Model:
 
 
 def read_input_source(path: str) -> str:
+    if path == '-':
+        return sys.stdin.read()
     if is_url_arg(path):
         return decode_share_link(path)
-    with open(path, newline="") as f:
+    if path.startswith('t256:') or (not os.path.exists(path) and looks_like_cid(path)):
+        return load_cid(path)
+    with open(path, encoding='utf-8', newline="") as f:
         return f.read()
 
 
@@ -2324,8 +2479,9 @@ def _format_modl_id(nid: str) -> str:
     return "".join(out)
 
 
-def annotate(engine: Engine, path: str, problems, out_path: str):
-    src = read_input_source(path)
+def annotate(engine: Engine, path: str, problems, out_path: str, src=None):
+    if src is None:
+        src = read_input_source(path)
     if engine.model.lang == "modl":
         pieces = re.split(r"(\r?\n)", src)
         lines = pieces[::2]
@@ -2367,10 +2523,12 @@ def annotate(engine: Engine, path: str, problems, out_path: str):
 
 def main(argv):
     args = argv[1:]
-    flags = {"link": False, "annotate": None, "strict": False, "infer_style": False, "lang": None}
+    flags = {"link": False, "annotate": None, "strict": False, "infer_style": False, "lang": None, "portable": False}
     rest = []
     for a in args:
-        if a == "--strict":
+        if a == "--portable":
+            flags["portable"] = True
+        elif a == "--strict":
             flags["strict"] = True
         elif a == "--infer-style":
             flags["infer_style"] = True
@@ -2391,7 +2549,7 @@ def main(argv):
     cmd = rest[0]
     if cmd not in ("build", "run", "check"):
         # allow `gripeline file.dot` or `gripeline file.modl` -> build
-        if os.path.exists(cmd) or is_url_arg(cmd):
+        if os.path.exists(cmd) or is_url_arg(cmd) or cmd == "-" or cmd.startswith("t256:") or looks_like_cid(cmd):
             rest = ["build"] + rest
             cmd = "build"
         else:
@@ -2403,27 +2561,33 @@ def main(argv):
     path = rest[1]
 
     try:
-        engine = build_engine(path, lang=flags["lang"])
-    except (GripError, OSError) as e:
+        source = read_input_source(path)
+        lang = detect_lang(path, source, flags['lang'])
+        result = gripeline_api(source, lang, portable=flags['portable'])
+        if any(p['code'] == 'parse' for p in result['problems']):
+            raise GripError(result['problems'][0]['message'])
+    except (GripError, OSError, UnicodeError) as e:
         print(f"gripeline: parse error: {e}", file=sys.stderr)
         return 2
 
-    problems = engine.run_checks()
+    problems = [(p['code'], p['message']) for p in result['problems']]
 
-    for w in engine.warnings:
+    for w in result['warnings']:
         print(f"gripeline: {w}", file=sys.stderr)
 
     if flags["annotate"] and flags["link"] and problems:
-        marks = sorted(engine.offending_nodes) + [f"L{n}" for n in sorted(engine.offending_edges)]
-        print(encode_share_link(read_input_source(path)) + "&mark=" + urllib.parse.quote(",".join(marks)), file=sys.stderr)
+        marks = result["marks"]
+        print(encode_share_link(source) + "&mark=" + urllib.parse.quote(",".join(marks)), file=sys.stderr)
     elif flags["annotate"] and problems:
+        engine = Engine(parse_source(source, lang))
+        engine.run_checks()
         if isinstance(flags["annotate"], str):
             out_path = flags["annotate"]
         else:
             ext = ".annotated.modl" if engine.model.lang == "modl" else ".annotated.dot"
             base = "share" if is_url_arg(path) else os.path.splitext(path)[0]
             out_path = base + ext
-        annotate(engine, path, problems, out_path)
+        annotate(engine, path, problems, out_path, src=source)
 
     if cmd == "check":
         if problems:
@@ -2435,11 +2599,7 @@ def main(argv):
         emit_diagnostics(path, problems)
         return 65
 
-    try:
-        bash = engine.transpile()
-    except GripError as e:
-        print(f"gripeline: {e}", file=sys.stderr)
-        return 2
+    bash = result["bash"]
 
     if cmd == "build":
         sys.stdout.write(bash)
@@ -2450,7 +2610,10 @@ def main(argv):
         with os.fdopen(fd, "w") as f:
             f.write(bash)
         try:
-            p = subprocess.run(["bash", name])
+            p = subprocess.run([locate_bash(), name.replace("\\", "/")])
+        except (GripError, OSError) as error:
+            print(f"gripeline: {error}", file=sys.stderr)
+            return 2
         finally:
             os.unlink(name)
         return p.returncode

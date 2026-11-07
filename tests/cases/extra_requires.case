@@ -1,0 +1,16 @@
+name: extra-requires
+spec: 14.5
+expect: contains
+runnable: true
+=== dot ===
+digraph { graph [gl_requires="cat printf" gl_env="linux macos windows apptron"]; a [shape=box label="printf hello"]; }
+=== modl ===
+#gl requires cat printf
+#gl env linux macos windows apptron
+a square printf hello
+=== bash ===
+command -v cat >/dev/null
+command -v printf >/dev/null
+printf hello
+=== stdout ===
+hello

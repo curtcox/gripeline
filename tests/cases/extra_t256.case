@@ -1,0 +1,13 @@
+name: extra-t256
+spec: 4
+expect: bash
+=== dot ===
+digraph { input [shape=note label="t256:AAAAAAACaGk"]; p [shape=box label="cat"]; output [shape=note label="t256:"]; input -> p -> output; }
+=== modl ===
+input hex t256:AAAAAAACaGk
+p square cat
+output hex t256:
+input -> p -> output
+=== bash ===
+command -v t256 >/dev/null || { echo "gripeline: t256 not found" >&2; exit 127; }
+t256 load AAAAAAACaGk | cat | t256 save -f t256 -

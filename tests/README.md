@@ -127,3 +127,8 @@ grep 404 < access.log | wc -l > counts.txt
 Drop a new `*.case` file in `cases/` (or `cases/errors/`). No registration step —
 the runner globs `cases/**/*.case`. Start from the closest existing file. Pick
 `expect: bash` if you can predict the exact output, otherwise `contains`.
+
+Editor/API regression tests in `test_units.py` compare the pure API against CLI
+build results for every fixture in both languages, test stdin and CID inputs,
+and check CID syntax and Bash discovery. `web/tests/` contains optional browser
+checks; these use Node/Playwright only and are separate from `make check`.

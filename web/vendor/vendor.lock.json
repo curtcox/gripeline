@@ -1,0 +1,99 @@
+[
+  {
+    "repo": "https://github.com/pyodide/pyodide",
+    "commit": "0.27.7",
+    "path": "pyodide.mjs",
+    "url": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.mjs",
+    "target": "pyodide/pyodide.mjs",
+    "sha256": "04c052c815abb0bf2981fa38c2dfa58e3120ee5288c956df2b2a15e301782c5f"
+  },
+  {
+    "repo": "https://github.com/pyodide/pyodide",
+    "commit": "0.27.7",
+    "path": "pyodide.asm.js",
+    "url": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.asm.js",
+    "target": "pyodide/pyodide.asm.js",
+    "sha256": "6b4c90de5b7172873f04f21884d0e9d2274e305fe32116558fe3e4fbe3618d51"
+  },
+  {
+    "repo": "https://github.com/pyodide/pyodide",
+    "commit": "0.27.7",
+    "path": "pyodide.asm.wasm",
+    "url": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.asm.wasm",
+    "target": "pyodide/pyodide.asm.wasm",
+    "sha256": "a50dd1843f805a0b7c45b61037ee0d7b26dfe85efe0e18ef95a34ad24e401f5f"
+  },
+  {
+    "repo": "https://github.com/pyodide/pyodide",
+    "commit": "0.27.7",
+    "path": "python_stdlib.zip",
+    "url": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/python_stdlib.zip",
+    "target": "pyodide/python_stdlib.zip",
+    "sha256": "16611534726e5d8ac2bd8f926410b2dcb8d6f49aa24913463533b457a2115c16"
+  },
+  {
+    "repo": "https://github.com/pyodide/pyodide",
+    "commit": "0.27.7",
+    "path": "pyodide-lock.json",
+    "url": "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide-lock.json",
+    "target": "pyodide/pyodide-lock.json",
+    "sha256": "9c45b916001a750f4102fc287494f3eab215909c7535c626a20db80fd6333e2c"
+  },
+  {
+    "repo": "https://github.com/mdaines/viz-js",
+    "commit": "f45ae4f06e965e42d7c048f467e5585864c78114",
+    "path": "lib/viz-standalone.mjs",
+    "url": "https://cdn.jsdelivr.net/npm/@viz-js/viz@3.12.0/lib/viz-standalone.mjs",
+    "target": "viz.mjs",
+    "sha256": "3da60653b4cedf9b139b07f6dd3847bc5ea0aee508b4b97910770688b2d0d2d0",
+    "version": "3.12.0"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "4667a5b12a6feb54ccf553452ce50f6779b9b9dc",
+    "path": "js/parse.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/4667a5b12a6feb54ccf553452ce50f6779b9b9dc/js/parse.js",
+    "target": "modl/parse.js",
+    "sha256": "587fda4548814761f62620f4ac8b5a91ade0606eaa5b3fa52e9162ef343da074"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "4667a5b12a6feb54ccf553452ce50f6779b9b9dc",
+    "path": "js/diagram-features.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/4667a5b12a6feb54ccf553452ce50f6779b9b9dc/js/diagram-features.js",
+    "target": "modl/diagram-features.js",
+    "sha256": "fea251f948d17b9984528dcc10b1edd3b04282848882bc55851660d561e3ba19"
+  },
+  {
+    "repo": "https://github.com/curtcox/apptron",
+    "commit": "e7bab104c596c6b93f858fd619b53cb4f0230eb9",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/lz-string-1.5.0.mjs",
+    "url": "https://raw.githubusercontent.com/curtcox/apptron/e7bab104c596c6b93f858fd619b53cb4f0230eb9/vendor/fragment-kit-v0.3.4/vendor/lz-string-1.5.0.mjs",
+    "target": "lz-string.mjs",
+    "sha256": "8d9eea78bc561e73090ba11a3bd0e20b322958841e218acb49e82fc00f929b2c"
+  },
+  {
+    "repo": "https://github.com/curtcox/apptron",
+    "commit": "e7bab104c596c6b93f858fd619b53cb4f0230eb9",
+    "path": "vendor/LICENSE-lz-string",
+    "url": "https://raw.githubusercontent.com/curtcox/apptron/e7bab104c596c6b93f858fd619b53cb4f0230eb9/vendor/LICENSE-lz-string",
+    "target": "LICENSE-lz-string",
+    "sha256": "433fc9dfe659dbfb1e91eed8351f13651e97bfa3ac6d03394c3d63f61d4bbc80"
+  },
+  {
+    "repo": "https://github.com/pyodide/pyodide",
+    "commit": "0.27.7",
+    "path": "LICENSE",
+    "url": "https://raw.githubusercontent.com/pyodide/pyodide/0.27.7/LICENSE",
+    "target": "pyodide/LICENSE",
+    "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+  },
+  {
+    "repo": "https://github.com/mdaines/viz-js",
+    "commit": "f45ae4f06e965e42d7c048f467e5585864c78114",
+    "path": "LICENSE",
+    "url": "https://raw.githubusercontent.com/mdaines/viz-js/f45ae4f06e965e42d7c048f467e5585864c78114/LICENSE",
+    "target": "LICENSE-viz",
+    "sha256": "28d1d05bd2cf402278ac4233b0656616fe386650e2d978aed11db66c53a51ef4"
+  }
+]

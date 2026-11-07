@@ -149,3 +149,15 @@ to find them. In pipeline order:
   explains what changed and why.
 - `main` deploys the Pages site on every push. Don't push unless asked.
 - `site/_site/` is build output and is gitignored. Never commit it.
+
+## Editor and additional CLI options
+
+`web/` is copied into the generated site's `editor/` directory, together with
+`gripeline.py`. `scripts/vendor.py` verifies browser assets against
+`web/vendor/vendor.lock.json`; `--fetch` restores missing files only after hash
+verification. Browser checks live in `web/tests/` and do not add dependencies
+to `make check`. Input `-` reads stdin; CID references use native `t256 load`.
+`--portable` enables advisory command warnings. Windows uses `gripeline.cmd`
+or `gripeline.ps1`, with Python and Git Bash installed. `install.sh` and
+`install.ps1` install a reviewed local checkout; `GRIPELINE_BASH` overrides
+Bash discovery.

@@ -1,0 +1,14 @@
+name: extra-t256-fanin
+spec: 4
+expect: bash
+=== dot ===
+digraph { a [shape=note label="t256:AAAAAAACaGk"]; b [shape=box label="printf bye"]; join [gl_role=op label="cat"]; a -> join; b -> join; }
+=== modl ===
+a hex t256:AAAAAAACaGk
+b square printf bye
+join square cat #gl role=op
+a -> join
+b -> join
+=== bash ===
+command -v t256 >/dev/null || { echo "gripeline: t256 not found" >&2; exit 127; }
+cat <(t256 load AAAAAAACaGk) <(printf bye)

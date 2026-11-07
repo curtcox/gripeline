@@ -1,0 +1,37 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {encode64,parseCID,loadCID,unwrapDiagram,shareLink} from '../src/cid.js';
+import {apptronSnapshot,apptronLink,localCommand} from '../src/run-targets.js';
+import LZString from '../vendor/lz-string.mjs';
+const cidOf=bytes=>{const prefix=new Uint8Array(6);prefix[5]=bytes.length;return encode64(prefix)+encode64(bytes);};
+test('inline CID and malformed canonical encodings',async()=>{
+  assert.equal(new TextDecoder().decode(await loadCID('AAAAAAACaGk')),'hi');
+  assert.throws(()=>parseCID('AAAAAAACaGl'));
+  assert.throws(()=>unwrapDiagram('{"format":"other","src":"x"}'));
+  assert.throws(()=>unwrapDiagram('{"src":"x","pos":{"a":[1,null]}}'));
+});
+test('CID load verifies hashed bytes',async()=>{
+  const data=new Uint8Array(70).fill(65),prefix=new Uint8Array(6);prefix[5]=70;
+  const cid=encode64(prefix)+encode64(new Uint8Array(await crypto.subtle.digest('SHA-512',data)));
+  const previous=globalThis.fetch;
+  try{
+    globalThis.fetch=async()=>new Response(data);
+    assert.deepEqual(await loadCID(cid),data);
+    globalThis.fetch=async()=>new Response(new Uint8Array(70));
+    await assert.rejects(loadCID(cid),/verification/);
+  }finally{globalThis.fetch=previous;}
+});
+test('snapshot is inert and survives Apptron compression',async()=>{
+  const snapshot=await apptronSnapshot('a square echo hi','modl','# python',[]);
+  assert.match(snapshot,/overlay: gallery\/gripeline/);
+  assert.match(snapshot,/check pipeline.modl/);
+  assert.doesNotMatch(snapshot,/^python3 gripeline.py run/m);
+  const link=await apptronLink(snapshot);
+  assert.equal(LZString.decompressFromEncodedURIComponent(new URL(link).searchParams.get('compressed')),snapshot);
+  await assert.rejects(apptronSnapshot('-- injected --','modl','python',[]),/delimiter/);
+  await assert.rejects(apptronSnapshot('x'.repeat(1048576),'modl','python',[]),/1 MiB/);
+});
+test('local CID command has shell-independent quoting',()=>{
+  assert.equal(localCommand('src',{},'AAAAAAAA'),'gripeline run "t256:AAAAAAAA"');
+  assert.match(shareLink('a square echo hi',{},'https://example.com/editor/'),/#h1=/);
+});

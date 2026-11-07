@@ -279,8 +279,8 @@ class DetectLang(unittest.TestCase):
             with self.subTest(src=src):
                 self.assertEqual(gl.detect_lang(None, src), "modl")
 
-    def test_share_link_is_modl(self):
-        self.assertEqual(gl.detect_lang("https://modl.hashbin.page/#h1=x", "digraph {"), "modl")
+    def test_share_link_sniffs_language(self):
+        self.assertEqual(gl.detect_lang("https://modl.hashbin.page/#h1=x", "digraph {"), "dot")
 
 
 class ShareLinks(unittest.TestCase):
@@ -294,8 +294,8 @@ class ShareLinks(unittest.TestCase):
         self.assertEqual(code, 0, err)
         self.assertIn("echo hi | wc -c", out)
 
-    def test_cid_links_are_refused(self):
-        with self.assertRaisesRegex(gl.GripError, "256t"):
+    def test_malformed_cid_links_are_refused(self):
+        with self.assertRaisesRegex(gl.GripError, "t256"):
             gl.decode_share_link("https://modl.hashbin.page/#256t.abc")
 
     def test_bad_payload(self):
@@ -421,6 +421,87 @@ class ReviewRegressions(unittest.TestCase):
             gl.annotate(e, str(path), e.problems, str(out))
             result = out.read_bytes().decode()
             self.assertTrue(result.startswith('x square "a\fb"\r\ny hex g\r\nz hex h\r\ny -> z red\r\n'))
+
+class EditorPrerequisites(unittest.TestCase):
+    def test_api_fixtures_match_cli(self):
+        import run as harness
+        for path in sorted((ROOT / 'cases').rglob('*.case')):
+            case = harness.parse_case(path)
+            for lang in ('dot', 'modl'):
+                src = getattr(case, lang, '')
+                if not src:
+                    continue
+                with self.subTest(path=path.name, lang=lang):
+                    result = gl.gripeline_api(src, lang)
+                    with tempfile.TemporaryDirectory() as directory:
+                        source = Path(directory) / ('input.' + lang)
+                        source.write_text(src)
+                        code, out, err = run_cli('build', str(source))
+                    self.assertEqual(result['bash'], out)
+                    self.assertEqual(bool(result['problems']), code != 0)
+
+    def test_stdin(self):
+        from unittest.mock import patch
+        with patch('sys.stdin', io.StringIO('a square echo hi')):
+            code, out, err = run_cli('build', '-')
+        self.assertEqual(code, 0, err)
+        self.assertIn('echo hi', out)
+
+    def test_cid_input(self):
+        from unittest.mock import patch
+        payload = json.dumps({'format':'hashbin-diagram', 'version':1,
+                              'src':'a square echo hi', 'pos':{}})
+        with patch('gripeline.shutil.which', return_value='/bin/t256'), patch(
+            'gripeline.subprocess.run', return_value=subprocess.CompletedProcess([], 0, payload, '')
+        ) as run:
+            self.assertEqual(gl.read_input_source('t256:AAAAAAAA'), 'a square echo hi')
+            self.assertEqual(run.call_args.args[0], ['/bin/t256', 'load', 'AAAAAAAA'])
+
+    def test_cid_validation(self):
+        self.assertEqual(gl.cid_reference('t256:AAAAAAACaGk.txt'), 'AAAAAAACaGk')
+        for value in ('AAAAAAACaGl', 'AAAAAAAA=', 'AAAAAAAB', 't256:abc', 'AAAAAAAA.bad-'):
+            with self.subTest(value=value), self.assertRaises(gl.GripError):
+                gl.cid_reference(value)
+
+    def test_bash_locator(self):
+        from unittest.mock import patch
+        with patch.dict(os.environ, {'GRIPELINE_BASH':'C:\\Windows\\System32\\bash.exe'}):
+            with self.assertRaisesRegex(gl.GripError, 'WSL'):
+                gl.locate_bash()
+
+    def test_cid_run_with_stub_t256(self):
+        if os.name == 'nt':
+            self.skipTest('POSIX executable stub; Windows CID resolution is covered by the mocked test')
+        with tempfile.TemporaryDirectory() as directory:
+            stub = Path(directory) / 't256'
+            stub.write_text("#!/bin/sh\nprintf 'a square printf hello\\n'\n")
+            stub.chmod(0o755)
+            from unittest.mock import patch
+            with patch.dict(os.environ, {'PATH': directory + os.pathsep + os.environ['PATH']}):
+                result = subprocess.run([sys.executable, str(ROOT.parent / 'gripeline.py'), 'run', 't256:AAAAAAAA'], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, 'hello')
+
+    def test_missing_requirements_report_all(self):
+        src = '#gl requires gripeline_missing_one gripeline_missing_two\na square printf should-not-run'
+        result = gl.gripeline_api(src)
+        process = subprocess.run([gl.locate_bash(), '-c', result['bash']], capture_output=True, text=True)
+        self.assertEqual(process.returncode, 127)
+        self.assertEqual(process.stdout, '')
+        self.assertIn('gripeline_missing_one gripeline_missing_two', process.stderr)
+
+    def test_portable_advice_is_not_an_error(self):
+        result = gl.gripeline_api('a square exotic-tool', portable=True)
+        self.assertEqual(result['problems'], [])
+        self.assertTrue(result['warnings'])
+
+    def test_api_does_no_io(self):
+        from unittest.mock import patch
+        with patch('builtins.open', side_effect=AssertionError('I/O')), patch(
+            'gripeline.subprocess.run', side_effect=AssertionError('process')):
+            result = gl.gripeline_api('digraph { a [label="echo hi"]; }', None)
+        self.assertEqual(result['problems'], [])
+        self.assertIn('echo hi', result['bash'])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

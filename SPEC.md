@@ -355,6 +355,31 @@ changing what a node fundamentally *is*.
 
 ---
 
+### Content-addressed file nodes
+
+A file node labeled `t256:CID[.ext]` is a source and emits `t256 load CID`.
+A file node labeled `t256:` is a sink and emits `t256 save -f t256 -`;
+its reference is written to stdout. Both participate in pipes as programs do,
+including `<(t256 load CID)` at fan-in operators. Sources cannot have incoming
+edges, and sinks cannot have outgoing edges (E14). A pipeline using either
+emits this guard after the prologue:
+
+```bash
+command -v t256 >/dev/null || { echo "gripeline: t256 not found" >&2; exit 127; }
+```
+
+CID validation is purely syntactic: an eight-character base64url six-byte
+length prefix, followed by canonical unpadded base64url. Lengths up to 64
+carry exactly that many inline bytes; larger lengths carry a 64-byte SHA-512
+hash (86 characters). Suffix labels contain only ASCII letters and digits,
+separated by dots. Malformed references are **E14**. No static check loads
+content or contacts a network. `#gl t256` (dot: `gl_t256=true`) also interprets
+bare CID labels on file nodes as references.
+
+Compatibility: file labels beginning `t256:` now name content, replacing the
+previous interpretation as literal local filenames.
+
+
 ## 5. File descriptors and ports
 
 Graphviz nodes have named **ports** — the little connection points you can attach
@@ -624,6 +649,7 @@ itself*.
 | E11  | every `dashed` control edge in `modl` (Commands/Typed) has text `&&`, `\|\|`, `;`, or empty | "dashed edge has invalid control text (expected `&&`, `\|\|`, or `;`)" |
 | E12  | every shell variable or function name is a valid shell identifier (`[A-Za-z_][A-Za-z0-9_]*`) | "variable/function name `my-var` is not a valid shell identifier" |
 | E13  | every loop has a header (`gl_loop` / `loop=`), and every loop, subshell, group and function has at least one member | "loop `x` has no loop header" / "loop `each` has an empty body" |
+| E14 | t256 references are syntactically valid; sources have no incoming edges and sinks no outgoing edges | "invalid t256 CID alphabet or length" |
 
 **Output contract for a non-executable graph:**
 
@@ -1355,3 +1381,41 @@ in deterministic left-to-right layers. Saved positions take precedence.
 
 This CLI does not advertise the unimplemented `--strict` and `--infer-style`
 options; the optional modes described elsewhere remain future capabilities.
+
+### 14.5 Requirements and environments
+
+`#gl requires jq python3 t256` declares required commands (dot:
+`gl_requires="jq python3 t256"`). Tool names contain ASCII letters, digits,
+`_`, `+`, `.`, or `-`; other names are E10. Emitted bash checks every named
+command with `command -v`, reports all missing commands, and exits 127 before
+running the pipeline. These declarations are independent of t256's guard.
+
+`#gl env linux macos windows apptron` limits intended targets (dot:
+`gl_env="linux macos windows apptron"`). Unknown environments are E10.
+This is editor metadata, not an operating-system detector in emitted bash.
+An omitted declaration does not prove that arbitrary commands are portable.
+
+`--portable` adds advisory warnings for first command words outside this set:
+`echo printf cat tee sort uniq wc head tail cut tr sed grep awk find xargs test
+true false pwd cd mkdir rm cp mv touch basename dirname env sh bash t256`.
+It neither examines shell scripts recursively nor guarantees identical utility
+options across platforms. Advice never changes the exit status of `check`.
+
+### 14.6 Browser API and input references
+
+`gripeline_api(src, lang=None)` is a pure, standard-library API returning
+`lang`, `bash`, `problems` (`code`, `message`, `line`, `node`), `warnings`, and
+`marks`. Parse errors have code `parse`; failed checks return empty bash.
+Additional `requires` and `environments` fields expose declarations. Optional
+`portable=True` enables the same advice as the CLI. It performs no file,
+process, network, or terminal I/O. The CLI uses this evaluation path.
+
+CLI input `-` reads source from stdin. CID inputs (bare, `t256:CID`, or an
+HTTP(S) link whose fragment is a CID) invoke `t256 load CID`; verification is
+performed by t256. A hashbin-diagram JSON envelope with version 1 is unwrapped.
+Inline `#h1=` links remain supported, without t256. URL inputs now sniff source
+language, allowing dot as well as modl links; `--lang` overrides detection.
+Missing t256 or malformed inputs exit 2. `run` uses `GRIPELINE_BASH`, then Bash
+on PATH, then Git for Windows installation locations. The Windows WSL launcher
+is rejected; run gripeline inside WSL instead. Scripts use temporary files so
+pipeline stdin remains available.

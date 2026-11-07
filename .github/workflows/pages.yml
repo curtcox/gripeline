@@ -38,6 +38,9 @@ jobs:
       - name: Install Graphviz
         run: sudo apt-get update && sudo apt-get install -y graphviz
 
+      - name: Verify browser dependencies
+        run: python3 scripts/vendor.py
+
       - name: Build site
         run: MODL_REPO="${GITHUB_WORKSPACE}/.modl-repo" python3 site/build.py site/_site
 
@@ -51,7 +54,14 @@ jobs:
   # a failure turns the run red without blocking the deploy: the published
   # site shows the failing results.
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -70,6 +80,7 @@ jobs:
           node-version: "22"
 
       - name: Install Graphviz
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y graphviz
 
       - name: Run conformance tests

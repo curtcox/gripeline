@@ -82,3 +82,36 @@ shapes; `hex` remains supported. See SPEC §14.4 for compatibility details.
 Use `./gripeline check --annotate --link file.modl` to print a review link
 on stderr instead of writing an annotated copy. Whole-line `#gl` settings
 always target the graph, even inside a block.
+
+## Editor and portable execution
+
+The site build includes `/editor/`: source, diagram, bash, diagnostics, share
+links, downloads, and a gallery generated from conformance fixtures. It runs
+the real Python compiler under a pinned, self-hosted Pyodide worker. Links
+never execute commands. Review the bash before copying a local-run command.
+
+```sh
+./gripeline build - < pipeline.modl
+./gripeline run t256:AAAAAAAA
+./gripeline check --portable pipeline.modl
+./install.sh                       # default: ~/.local/bin
+python3 scripts/vendor.py          # verify pinned browser assets
+python3 scripts/vendor.py --fetch  # restore missing assets, checking hashes
+```
+
+On Windows, run `./install.ps1` from a reviewed checkout, then open a new
+terminal. Python (`py -3`) and Git for Windows Bash are required. Set
+`GRIPELINE_BASH` to select Bash explicitly. WSL is supported by running the
+Linux installation inside WSL; a Windows Python process rejects the WSL Bash
+launcher. Install native t256 from [256t.org](https://256t.org) for CID inputs.
+
+A source file node `t256:CID` emits `t256 load CID`; a sink `t256:` emits
+`t256 save -f t256 -`, printing its reference. Use `#gl requires ...` to declare
+tools and `#gl env ...` to declare intended environments. t256 provides the
+portable operations `load` (instead of curl/wget/Invoke-WebRequest), `cid` and
+`verify` (instead of sha256sum/shasum/certutil), and `save` (instead of ad-hoc
+uploads). CID syntax and content verification use t256's SHA-512 identifiers.
+
+The Apptron target remains disabled until its gripeline overlay is released.
+HashBin publishing and a canonical dedicated origin require external app
+registration. See [EDITOR_PLAN.md](EDITOR_PLAN.md) for current phase status.

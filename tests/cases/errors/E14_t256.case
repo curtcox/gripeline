@@ -1,0 +1,12 @@
+name: E14-t256
+spec: 9
+expect: error
+code: E14
+=== dot ===
+digraph { a [shape=note label="t256:bad"]; b [shape=box label="cat"]; a -> b; }
+=== modl ===
+a hex t256:bad
+b square cat
+a -> b
+=== error ===
+E14
