@@ -200,7 +200,7 @@ class CheckResult:
 
 def write_temp(text: str, suffix: str) -> str:
     fd, name = tempfile.mkstemp(suffix=suffix)
-    with os.fdopen(fd, "w") as f:
+    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
         f.write(text if text.endswith("\n") else text + "\n")
     return name
 
@@ -323,7 +323,7 @@ def check_lint(case: Case) -> CheckResult:
     expected = case.sections.get("bash", "")
     name = write_temp(expected, ".sh")
     try:
-        p = subprocess.run([BASH_BIN, "-n", name], capture_output=True, text=True)
+        p = subprocess.run([BASH_BIN, "-n", name.replace("\\", "/")], capture_output=True, text=True)
     finally:
         os.unlink(name)
     if p.returncode != 0:
@@ -420,7 +420,7 @@ def check_run(case: Case, result, label: str = "run") -> CheckResult:
         env["PATH"] = f"{STUBS_DIR}{os.pathsep}{env['PATH']}"
     stdin = case.sections.get("stdin", "")
     try:
-        p = subprocess.run([BASH_BIN, script], input=stdin,
+        p = subprocess.run([BASH_BIN, script.replace("\\", "/")], input=stdin,
                            capture_output=True, text=True, env=env,
                            cwd=tempfile.gettempdir())
     finally:

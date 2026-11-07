@@ -495,6 +495,22 @@ class EditorPrerequisites(unittest.TestCase):
         self.assertEqual(result['problems'], [])
         self.assertTrue(result['warnings'])
 
+    def test_run_script_uses_utf8_and_lf_on_windows(self):
+        from unittest.mock import patch
+        fdopen = os.fdopen
+        def windows_fdopen(fd, mode, **kwargs):
+            kwargs.setdefault('newline', '\r\n')
+            kwargs.setdefault('encoding', 'ascii')
+            return fdopen(fd, mode, **kwargs)
+        def execute(command, **kwargs):
+            content = Path(command[1]).read_bytes()
+            self.assertNotIn(b'\r', content)
+            self.assertIn('café'.encode(), content)
+            return subprocess.CompletedProcess(command, 0)
+        with patch('gripeline.os.fdopen', side_effect=windows_fdopen), patch('gripeline.subprocess.run', side_effect=execute):
+            code, _, err = run_cli('run', gl.encode_share_link('a square echo café'))
+        self.assertEqual(code, 0, err)
+
     def test_api_does_no_io(self):
         from unittest.mock import patch
         with patch('builtins.open', side_effect=AssertionError('I/O')), patch(

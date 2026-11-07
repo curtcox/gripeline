@@ -1418,4 +1418,5 @@ language, allowing dot as well as modl links; `--lang` overrides detection.
 Missing t256 or malformed inputs exit 2. `run` uses `GRIPELINE_BASH`, then Bash
 on PATH, then Git for Windows installation locations. The Windows WSL launcher
 is rejected; run gripeline inside WSL instead. Scripts use temporary files so
-pipeline stdin remains available.
+pipeline stdin remains available. Generated temporary scripts use UTF-8 and LF
+line endings on every platform; Windows CLI text streams use UTF-8.

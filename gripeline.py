@@ -2506,7 +2506,7 @@ def annotate(engine: Engine, path: str, problems, out_path: str, src=None):
                 lines.append(f"{_format_modl_id(nid)} red")
         for _code, msg in problems:
             lines.append(f"# {msg}")
-        with open(out_path, "w", newline="") as f:
+        with open(out_path, "w", encoding="utf-8", newline="") as f:
             f.write("".join(line + (endings[i] if i < len(endings) else newline) for i, line in enumerate(lines)))
         return
 
@@ -2607,7 +2607,7 @@ def main(argv):
 
     if cmd == "run":
         fd, name = tempfile.mkstemp(suffix=".sh")
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             f.write(bash)
         try:
             p = subprocess.run([locate_bash(), name.replace("\\", "/")])
@@ -2622,4 +2622,8 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    if os.name == 'nt':
+        for stream in (sys.stdin, sys.stdout, sys.stderr):
+            stream.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(newline='\n')
     sys.exit(main(sys.argv))
