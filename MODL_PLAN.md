@@ -2,6 +2,11 @@
 
 **Status:** implemented (Phases 0–3). **Date:** 2026-11-07.
 
+> **Superseded in part:** decision 1's "modl's grammar does not change" no
+> longer holds. modl's grammar may now change; upward compatibility is a
+> preference, not a hard constraint. Follow-up fixes and planned modl
+> enhancements are in [MODL_REVIEW_PLAN.md](MODL_REVIEW_PLAN.md).
+
 Goal: `gripeline build|run|check foo.modl` works the way it does for `foo.dot`.
 The same `.modl` file still opens and renders unchanged in the
 [modl editor](https://modl.hashbin.page/), and running it means exactly what the
