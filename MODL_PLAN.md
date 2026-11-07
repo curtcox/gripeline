@@ -1,6 +1,6 @@
 # Plan: modl as a second gripeline source language
 
-**Status:** proposal, not started. **Date:** 2026-11-07.
+**Status:** design decided (D1–D5), implementation not started. **Date:** 2026-11-07.
 
 Goal: `gripeline build|run|check foo.modl` works the way it does for `foo.dot`.
 The same `.modl` file still opens and renders unchanged in the
@@ -8,7 +8,7 @@ The same `.modl` file still opens and renders unchanged in the
 equivalent dot diagram means: **both front ends emit identical bash for the
 same program.**
 
-Decided so far (from the Q&A):
+Decided (from the Q&A; detailed decisions D1–D5 are in §2):
 
 1. gripeline-only meaning goes in **`#gl` comment pragmas**. modl's lexer drops
    comments, so pragmas are invisible to the modl renderer, the same way
@@ -51,12 +51,12 @@ modl facts that matter for execution:
 
 ---
 
-## 2. Decisions to confirm before coding
+## 2. Design decisions (decided)
 
-These are my recommendations. Each one is a single line to change if you
-disagree.
+All five decisions below are **decided** (2026-11-07) and are binding for the
+implementation.
 
-**D1. Operation text is the raw source slice, not modl's de-quoted value.**
+**D1 (decided). Operation text is the raw source slice, not modl's de-quoted value.**
 gripeline takes a node's (or edge's) text as the exact source characters from the
 first text word to the start of the comment, trailing whitespace trimmed. So
 
@@ -71,7 +71,7 @@ instead, shell quoting couldn't be expressed without tricks like `'"…"'`.
 *Cost:* the picture shows de-quoted text. That's cosmetic, and it is what a
 reader expects anyway.
 
-**D2. Shape → role table (modl only).**
+**D2 (decided). Shape → role table (modl only).**
 
 | modl shape         | role                                                  |
 |--------------------|-------------------------------------------------------|
@@ -84,7 +84,7 @@ reader expects anyway.
 `#gl role=…` always wins. Leaving `circle`/`none` neutral means an
 unstyled modl diagram (`a -> b -> c`) is a plain Commands pipe.
 
-**D3. Line style → edge kind (modl only).**
+**D3 (decided). Line style → edge kind (modl only).**
 
 - `solid` (default), `bold`, `dotted` → data edge (pipe/redirect, decided by endpoint roles, as today).
 - `dashed` → **control edge**. Its kind comes from the edge text in the commands
@@ -97,11 +97,11 @@ unstyled modl diagram (`a -> b -> c`) is a plain Commands pipe.
 So `make -> inst dashed &&` is drawn as an edge labelled `&&` and runs as `&&`.
 The picture says what the program does.
 
-**D4. Format detection.** `.modl` → modl, `.dot`/`.gv` → dot, and `--lang=modl|dot`
+**D4 (decided). Format detection.** `.modl` → modl, `.dot`/`.gv` → dot, and `--lang=modl|dot`
 overrides. Otherwise sniff: a first token of `strict`/`digraph`/`graph` means dot,
 anything else means modl.
 
-**D5. modl parse errors are fatal.** modl draws what it can, but gripeline refuses
+**D5 (decided). modl parse errors are fatal.** modl draws what it can, but gripeline refuses
 to run a partly-parsed program. It reports modl's own messages
 (`Line N: invalid node id "x"`, `empty node id`, `malformed edge line`) with
 exit 2, the same as a dot parse error.
