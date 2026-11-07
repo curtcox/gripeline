@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""gripeline — transpile a Graphviz `dot` file into a bash script.
+"""gripeline — transpile a Graphviz `dot` or `modl` file into a bash script.
 
-See SPEC.md (Draft 0.3). The emitted bash is the normative meaning of a graph.
+See SPEC.md. The emitted bash is the normative meaning of a graph.
 
 Stages:  parse -> extract/resolve roles -> static check (§9) -> transpile (§§4-8).
 
 CLI:
-    gripeline build <file.dot>     print transpiled bash to stdout
-    gripeline run   <file.dot>     transpile then exec under bash; propagate status
-    gripeline check <file.dot>     run only the §9 static check; exit 0 or 65
-        --annotate[=out.dot]       also write a diagnostic-annotated dot copy
+    gripeline build <file>         print transpiled bash to stdout
+    gripeline run   <file>         transpile then exec under bash; propagate status
+    gripeline check <file>         run only the §9 static check; exit 0 or 65
+        --lang=dot|modl            override language detection
+        --annotate[=out]           also write a diagnostic-annotated copy
         --strict                   ordering ambiguity is an error
         --infer-style              also read recommended visual conventions (off)
 """
@@ -23,7 +24,7 @@ from dataclasses import dataclass, field
 
 
 # ==========================================================================
-# Tokenizer
+# Tokenizer (dot)
 # ==========================================================================
 class Tok:
     def __init__(self, kind, val):
@@ -117,6 +118,7 @@ class Node:
     order: int = 0
     role: str = "program"
     extra_suffix: list = field(default_factory=list)  # synthetic redirects (dataflow)
+    pos: int | None = None  # source position (dot: token offset; modl: line number)
 
 
 @dataclass
@@ -128,6 +130,7 @@ class Edge:
     attrs: dict = field(default_factory=dict)
     cluster: str | None = None
     order: int = 0
+    pos: int | None = None  # source position (dot: token offset; modl: line number)
 
 
 @dataclass
@@ -136,6 +139,25 @@ class Cluster:
     attrs: dict = field(default_factory=dict)
     parent: str | None = None
     order: int = 0
+    pos: int | None = None
+
+
+RESERVED_SHAPE = {"box": "program", "note": "file", "cds": "stream"}
+
+
+@dataclass
+class Model:
+    nodes: dict[str, Node] = field(default_factory=dict)
+    edges: list[Edge] = field(default_factory=list)
+    clusters: dict[str, Cluster] = field(default_factory=dict)
+    graph_attrs: dict = field(default_factory=dict)
+    directed: bool = True
+    lang: str = "dot"
+    role_shapes: dict[str, str] = field(default_factory=lambda: dict(RESERVED_SHAPE))
+    line_styles: dict[str, str] = field(default_factory=dict)
+    problems: list[tuple[str, str]] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    raw_lines: list = field(default_factory=list)
 
 
 class GripError(Exception):
@@ -143,7 +165,7 @@ class GripError(Exception):
 
 
 # ==========================================================================
-# Parser
+# Parser (dot front end)
 # ==========================================================================
 class Parser:
     def __init__(self, toks):
@@ -192,6 +214,18 @@ class Parser:
         self.parse_stmts(scope)
         return self
 
+    def to_model(self) -> Model:
+        return Model(
+            nodes=self.nodes,
+            edges=self.edges,
+            clusters=self.clusters,
+            graph_attrs=self.graph_attrs,
+            directed=self.directed,
+            lang="dot",
+            role_shapes=dict(RESERVED_SHAPE),
+            line_styles={},
+        )
+
     def parse_node_id(self):
         t = self.next()
         name = t.val
@@ -221,12 +255,12 @@ class Parser:
                 self.next()
         return attrs
 
-    def ensure_node(self, name, scope):
+    def ensure_node(self, name, scope, pos=None):
         if name in self.clusters:
             return
         if name not in self.nodes:
             nd = Node(id=name, attrs=dict(scope.node_def), cluster=scope.cluster,
-                      order=self.nextorder())
+                      order=self.nextorder(), pos=self.pos if pos is None else pos)
             self.nodes[name] = nd
 
     def parse_stmts(self, scope):
@@ -260,6 +294,7 @@ class Parser:
                 continue
             # ID-led: node, edge, or graph-attr assignment
             if t.kind in ("ID", "STR"):
+                tok_pos = self.pos
                 name, port = self.parse_node_id()
                 nt = self.peek()
                 if nt.kind == "=" and port is None:
@@ -268,18 +303,19 @@ class Parser:
                     scope.attr_target[name] = val
                     continue
                 if nt.kind == "EDGE":
-                    self.parse_edge_stmt(name, port, scope)
+                    self.parse_edge_stmt(name, port, scope, tok_pos)
                     continue
                 # node statement
                 a = self.parse_attrs()
                 if name not in self.clusters:
-                    self.ensure_node(name, scope)
+                    self.ensure_node(name, scope, pos=tok_pos)
                     self.nodes[name].attrs.update(a)
                 continue
             # fallback skip
             self.next()
 
-    def parse_edge_stmt(self, first_name, first_port, scope):
+    def parse_edge_stmt(self, first_name, first_port, scope, tok_pos=None):
+        edge_pos = self.pos if tok_pos is None else tok_pos
         endpoints = [(first_name, first_port)]
         while self.peek().kind == "EDGE":
             self.next()
@@ -301,7 +337,7 @@ class Parser:
         a = self.parse_attrs()
         for (tn, tp) in endpoints:
             if tn is not None:
-                self.ensure_node(tn, scope)
+                self.ensure_node(tn, scope, pos=edge_pos)
         for i in range(len(endpoints) - 1):
             tn, tp = endpoints[i]
             hn, hp = endpoints[i + 1]
@@ -309,10 +345,11 @@ class Parser:
                 continue
             e = Edge(tail=tn, tail_port=tp, head=hn, head_port=hp,
                      attrs={**scope.edge_def, **a}, cluster=scope.cluster,
-                     order=self.nextorder())
+                     order=self.nextorder(), pos=edge_pos)
             self.edges.append(e)
 
     def parse_subgraph(self, scope, name):
+        sub_pos = self.pos
         if name is None or not name.startswith("cluster"):
             # anonymous or non-cluster subgraph: still its own scope for defaults,
             # but treated as transparent for execution. Give it a synthetic id.
@@ -320,7 +357,7 @@ class Parser:
             cid = name if name else f"__anon{self._anon}"
         else:
             cid = name
-        cl = Cluster(id=cid, parent=scope.cluster, order=self.nextorder())
+        cl = Cluster(id=cid, parent=scope.cluster, order=self.nextorder(), pos=sub_pos)
         self.clusters[cid] = cl
         self.expect("{")
         child = ScopeCtx(cluster=cid, node_def=dict(scope.node_def),
@@ -335,6 +372,11 @@ class ScopeCtx:
     node_def: dict
     edge_def: dict
     attr_target: dict
+
+
+def parse_dot(src: str) -> Model:
+    toks = tokenize(src)
+    return Parser(toks).parse().to_model()
 
 
 # ==========================================================================
@@ -355,24 +397,24 @@ def port_to_fd(port):
     return None
 
 
-RESERVED_SHAPE = {"box": "program", "note": "file", "cds": "stream"}
-
-
 # ==========================================================================
 # Engine: roles, checks, emission
 # ==========================================================================
 class Engine:
-    def __init__(self, parser: Parser):
-        self.p = parser
-        self.nodes = parser.nodes
-        self.edges = parser.edges
-        self.clusters = parser.clusters
-        self.graph_attrs = parser.graph_attrs
+    def __init__(self, model: Model | Parser):
+        if isinstance(model, Parser):
+            model = model.to_model()
+        self.model = model
+        self.p = model
+        self.nodes = model.nodes
+        self.edges = model.edges
+        self.clusters = model.clusters
+        self.graph_attrs = model.graph_attrs
         self.mapping = self.graph_attrs.get("gl_mapping", "typed")
-        self.problems: list[tuple[str, str]] = []
+        self.problems: list[tuple[str, str]] = list(model.problems)
         self.prepared = False
 
-    # ----- role resolution -----
+    # ----- role & edge-kind resolution -----
     def optext(self, node: Node):
         if "label" in node.attrs:
             return node.attrs["label"]
@@ -389,14 +431,30 @@ class Engine:
         if "gl_raw" in a:
             return "program"
         shape = a.get("shape")
-        if shape in RESERVED_SHAPE:
-            return RESERVED_SHAPE[shape]
-        if shape == "oval":
+        if shape in self.model.role_shapes:
+            return self.model.role_shapes[shape]
+        if shape == "oval" and self.model.lang == "dot":
             return "value" if self.mapping == "dataflow" else "program"
         # mapping default
         if self.mapping == "dataflow":
             return "value"
         return "program"
+
+    def edge_kind(self, e: Edge) -> str | None:
+        if "gl_edge" in e.attrs:
+            return e.attrs["gl_edge"]
+        style = e.attrs.get("style")
+        if style and self.model.line_styles.get(style) == "control":
+            if self.mapping != "dataflow":
+                txt = e.attrs.get("label", "").strip()
+                if txt == "&&":
+                    return "and"
+                if txt == "||":
+                    return "or"
+                if txt in ("", ";"):
+                    return "seq"
+                return "invalid_control"
+        return None
 
     def cluster_kind(self, cid):
         cl = self.clusters[cid]
@@ -454,7 +512,7 @@ class Engine:
         for e in self.edges:
             te = self.endpoint_role(e.tail)
             he = self.endpoint_role(e.head)
-            ge = e.attrs.get("gl_edge")
+            ge = self.edge_kind(e)
             if ge in ("seq", "and", "or"):
                 ctrl_adj.setdefault(e.tail, []).append(e.head)
                 ctrl_adj.setdefault(e.head, [])
@@ -608,7 +666,7 @@ class Engine:
         for nid, nd in old_nodes.items():
             if nd.role == "file":
                 new_nodes[nid] = Node(id=nid, attrs=dict(nd.attrs), role="file",
-                                      order=nd.order)
+                                      order=nd.order, pos=nd.pos)
 
         # input producer nodes (non-file, no in-edges, bearing a real command label)
         producers = {}
@@ -616,7 +674,7 @@ class Engine:
             if nd.role != "file" and indeg.get(nid, 0) == 0 and outdeg.get(nid, 0) > 0 \
                     and "label" in nd.attrs:
                 pn = Node(id=nid, attrs={"label": self.optext(nd)}, role="program",
-                          order=nd.order)
+                          order=nd.order, pos=nd.pos)
                 new_nodes[nid] = pn
                 producers[nid] = pn
 
@@ -630,7 +688,8 @@ class Engine:
         for k, e in enumerate(old_edges):
             label = e.attrs.get("label", "")
             pid = f"__e{k}"
-            pn = Node(id=pid, attrs={"label": label}, role="program", order=no())
+            pn = Node(id=pid, attrs={"label": label}, role="program",
+                      order=no(), pos=e.pos)
             # gl_stderr / gl_fd on producer (tail)
             new_nodes[pid] = pn
             edge_node_id[k] = pid
@@ -643,11 +702,11 @@ class Engine:
             if is_file(x) and not x_producers:
                 # genuine input file -> read redirect on the consuming program
                 new_edges.append(Edge(tail=x, tail_port=None, head=pid,
-                                      head_port=None, order=no()))
+                                      head_port=None, order=no(), pos=e.pos))
                 return
             if x in producers:
                 new_edges.append(Edge(tail=x, tail_port=None, head=pid,
-                                      head_port=None, order=no()))
+                                      head_port=None, order=no(), pos=e.pos))
                 # gl_stderr/gl_fd attaches to producer command
                 self._attach_edge_fd(e, producers[x])
                 return
@@ -656,20 +715,20 @@ class Engine:
             if len(prods) == 1:
                 src = edge_node_id[prods[0]]
                 new_edges.append(Edge(tail=src, tail_port=None, head=pid,
-                                      head_port=None, order=no()))
+                                      head_port=None, order=no(), pos=e.pos))
                 self._attach_edge_fd(e, new_nodes[src])
             elif len(prods) >= 2:
                 mid = merge_made.get(x)
                 if mid is None:
                     mid = f"__merge_{x}"
                     new_nodes[mid] = Node(id=mid, attrs={"label": "cat"},
-                                          role="op", order=no())
+                                          role="op", order=no(), pos=e.pos)
                     for j in prods:
                         new_edges.append(Edge(tail=edge_node_id[j], tail_port=None,
-                                              head=mid, head_port=None, order=no()))
+                                              head=mid, head_port=None, order=no(), pos=e.pos))
                     merge_made[x] = mid
                 new_edges.append(Edge(tail=mid, tail_port=None, head=pid,
-                                      head_port=None, order=no()))
+                                      head_port=None, order=no(), pos=e.pos))
 
         for k, e in enumerate(old_edges):
             pid = edge_node_id[k]
@@ -677,7 +736,7 @@ class Engine:
             y = e.head
             if is_file(y):
                 new_edges.append(Edge(tail=pid, tail_port=None, head=y,
-                                      head_port=None, order=no()))
+                                      head_port=None, order=no(), pos=e.pos))
             # else: y is wire/output; consumers pull from pid via their tail wiring
 
         self.nodes = new_nodes
@@ -739,7 +798,7 @@ class Engine:
         for e in edges:
             te = self.endpoint_role(e.tail)
             he = self.endpoint_role(e.head)
-            ge = e.attrs.get("gl_edge")
+            ge = self.edge_kind(e)
             if ge in ("and", "or"):
                 op = "&&" if ge == "and" else "||"
                 ctrl_andor.append((e.tail, e.head, op))
@@ -1064,14 +1123,37 @@ def find_cycle(adj):
 
 
 # ==========================================================================
-# CLI
+# Front-end dispatcher & CLI
 # ==========================================================================
-def build_engine(path):
+def detect_lang(path: str | None, src: str, lang: str | None = None) -> str:
+    if lang:
+        if lang not in ("dot", "modl"):
+            raise GripError(f"unknown language {lang!r}")
+        return lang
+    if path:
+        ext = os.path.splitext(path)[1].lower()
+        if ext == ".modl":
+            return "modl"
+        if ext in (".dot", ".gv"):
+            return "dot"
+    toks = tokenize(src)
+    if toks and toks[0].kind == "ID" and toks[0].val in ("strict", "digraph", "graph"):
+        return "dot"
+    return "modl"
+
+
+def parse_source(src: str, lang: str = "dot") -> Model:
+    if lang == "dot":
+        return parse_dot(src)
+    raise GripError(f"unsupported language {lang!r}")
+
+
+def build_engine(path, lang: str | None = None):
     with open(path) as f:
         src = f.read()
-    toks = tokenize(src)
-    parser = Parser(toks).parse()
-    return Engine(parser)
+    resolved_lang = detect_lang(path, src, lang=lang)
+    model = parse_source(src, resolved_lang)
+    return Engine(model)
 
 
 def emit_diagnostics(path, problems, stream=sys.stderr):
@@ -1097,7 +1179,7 @@ def annotate(engine, path, problems, out_path):
 
 def main(argv):
     args = argv[1:]
-    flags = {"annotate": None, "strict": False, "infer_style": False}
+    flags = {"annotate": None, "strict": False, "infer_style": False, "lang": None}
     rest = []
     for a in args:
         if a == "--strict":
@@ -1108,6 +1190,8 @@ def main(argv):
             flags["annotate"] = True
         elif a.startswith("--annotate="):
             flags["annotate"] = a.split("=", 1)[1]
+        elif a.startswith("--lang="):
+            flags["lang"] = a.split("=", 1)[1]
         else:
             rest.append(a)
 
@@ -1129,7 +1213,7 @@ def main(argv):
     path = rest[1]
 
     try:
-        engine = build_engine(path)
+        engine = build_engine(path, lang=flags["lang"])
     except (GripError, OSError) as e:
         print(f"gripeline: parse error: {e}", file=sys.stderr)
         return 2
