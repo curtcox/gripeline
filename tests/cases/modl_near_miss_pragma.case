@@ -1,0 +1,9 @@
+name: modl-near-miss-pragma
+expect: bash
+=== modl ===
+# gl mapping=typed
+a square true
+=== bash ===
+true
+=== stderr ===
+comment looks like a #gl pragma but is ignored

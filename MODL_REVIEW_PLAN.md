@@ -1,6 +1,6 @@
 # Plan: modl front-end fixes and modl enhancements
 
-**Status:** planned, not implemented. **Date:** 2026-11-07.
+**Status:** implemented in gripeline and the sibling `../modl` working tree. **Date:** 2026-11-07.
 
 This plan comes from a review of the modl front end in
 [`gripeline.py`](gripeline.py) (written after [MODL_PLAN.md](MODL_PLAN.md)
@@ -24,7 +24,7 @@ fix adds one.
 
 ## Part A — gripeline fixes
 
-### A1. Ports on program→program edges are ignored (engine; dot and modl)
+### ✅ A1. Ports on program→program edges are ignored (engine; dot and modl)
 
 ```modl
 a square make
@@ -54,7 +54,7 @@ text and fixtures (dot+modl twins). One known cost: bash doesn't wait for a
 process substitution, so state that in SPEC (or add `wait` handling the way
 the `tee >(…)` fan-out does).
 
-### A2. A repeated `#gl begin ID` silently merges blocks
+### ✅ A2. A repeated `#gl begin ID` silently merges blocks
 
 ```modl
 #gl begin g role=subshell
@@ -69,7 +69,7 @@ a -> b dashed &&             # emits { echo 1 && echo 2 }; the subshell is gone
 **Fix:** in `handle_whole_line_pragma` (`head == "begin"`), report E10
 `duplicate block id "g" (first opened on line N)` when `cid in self.clusters`.
 
-### A3. Words in non-final chain segments are dropped with no warning
+### ✅ A3. Words in non-final chain segments are dropped with no warning
 
 ```modl
 a square cat x -> b square wc -l   # runs: a | b
@@ -81,7 +81,7 @@ intent is lost. **Fix:** in `_parse_edge_line`, lint every non-final segment
 with more than one word:
 `line N: warning: "square cat x" after "a" is ignored (attributes go after the last id; quote text containing ->)`.
 
-### A4. Dataflow diagnostics and `--annotate` expose synthetic ids
+### ✅ A4. Dataflow diagnostics and `--annotate` expose synthetic ids
 
 In the dataflow mapping, `dataflow_transform` creates `__e{k}` and
 `__merge_{x}` nodes. Diagnostics then say things like
@@ -95,7 +95,7 @@ head, label) or source node. Messages should name the user's elements (e.g.
 synthetic should become `offending_edges` entries for their source lines.
 `annotate` must never write a node id that isn't in the source.
 
-### A5. `--annotate` splits lines differently from the parser
+### ✅ A5. `--annotate` splits lines differently from the parser
 
 `annotate` uses `src.splitlines()`. The parser uses `re.split(r"\r?\n", …)`
 (modl's rule). `splitlines` also breaks on `\v \f \x1c-\x1e \x85 U+2028
@@ -108,7 +108,7 @@ rewritten as LF.
 the original line endings back on write. Add a fixture with a `\f` inside a
 quoted string.
 
-### A6. Quoted control text on a dashed edge is rejected
+### ✅ A6. Quoted control text on a dashed edge is rejected
 
 `a -> b dashed "&&"` draws `&&`. Because of D1 the raw label is `"&&"`, so
 `Engine.edge_kind` returns `invalid_control` and the message shows `""&&""`.
@@ -118,7 +118,7 @@ de-quoted display text. Store it on the edge (e.g. `attrs["modl_text"]`) next
 to the raw `label`. The same applies to the `solid_control` lint
 (`a -> b "&&"`).
 
-### A7. Missing lints (non-fatal)
+### ✅ A7. Missing lints (non-fatal)
 
 - **Near-miss pragmas.** A comment matching `^\s*gl\b` (`# gl …`), `^GL\s`,
   `^gl[:=]`, or `^gl\S` (`#glmapping=…`) is silently treated as a normal
@@ -132,7 +132,7 @@ to the raw `label`. The same applies to the `solid_control` lint
 - **Stand-in text on a non-loop group** (subshell, group, function) is
   silently thrown away. Warn that it is display-only.
 
-### A8. Minor cleanups
+### ✅ A8. Minor cleanups
 
 - `--strict` and `--infer-style` are parsed and documented in `--help`, but
   nothing reads them. Either implement them (SPEC §3, §13) or remove them from
@@ -160,7 +160,7 @@ gripeline would use it. Grammar items change modl's hash-locked parser, so each
 one needs `engine-integrity.json` regenerated, `npm test`, `npm run check`, the
 browser tests, and a docs-src page.
 
-### B1. Parser as a standalone module, with source spans (do first)
+### ✅ B1. Parser as a standalone module, with source spans (do first)
 
 Move `lexLine`/`parseAttrs`/`parseSource` and the vocabulary into one ES module
 (e.g. `js/parse.js`) that `editor.js` imports. Keep it hash-locked. Add
@@ -171,7 +171,7 @@ optional column spans per word/attribute/text (`{start, end}`) to the result.
   `editor.js` apart between comment markers. With spans, the parity check can
   also verify the D1 raw text slices and the `--annotate` color-slot columns.
 
-### B2. Edge endpoint labels / ports: `a[err] -> b[3]`
+### ✅ B2. Edge endpoint labels / ports: `a[err] -> b[3]`
 
 `[` is not a legal id character today, so `a[err]` is currently a parse error.
 The new syntax gives every valid file the same meaning as before. Render the
@@ -184,7 +184,7 @@ bracket text as a small label near that end of the edge (like dot's
 - **gripeline:** `a[err] -> b` is equivalent to `#gl from=err`. fd routing
   becomes visible in the picture. Keep `from=`/`to=` as aliases.
 
-### B3. Groups drawn as boxes
+### ✅ B3. Groups drawn as boxes
 
 Proposed syntax: a node-like line whose last word is an unquoted `{` opens a
 group with that id and its attributes (shape → box style, color, text →
@@ -212,7 +212,7 @@ each -> tee
   and `#gl role=` on the `{` line sets subshell/group/function. Keep
   `#gl begin` as a deprecated alias for one release.
 
-### B4. More node shapes (vocabulary)
+### ✅ B4. More node shapes (vocabulary)
 
 Add standard flowchart shapes: `note` (document, folded corner), `cylinder`
 (data store), `parallelogram` (input/output), `stadium` (start/end),
@@ -227,7 +227,7 @@ Add standard flowchart shapes: `note` (document, folded corner), `cylinder`
   `cds` analog), `cylinder` → file, `subroutine` → function call. Keep `hex`
   → file for compatibility.
 
-### B5. More line styles (vocabulary)
+### ✅ B5. More line styles (vocabulary)
 
 Add `double` (and possibly `wavy`) for a second kind of flow.
 
@@ -236,7 +236,7 @@ Add `double` (and possibly `wavy`) for a second kind of flow.
 - **gripeline:** `double` = stderr (`from=err` without a pragma), so stderr
   routing shows in the picture.
 
-### B6. Full text instead of truncation
+### ✅ B6. Full text instead of truncation
 
 modl truncates node text at 22 characters and edge text at 28. Shell commands
 are often longer. Options: wrap onto up to N lines and grow the node; show the
@@ -245,7 +245,7 @@ full text on hover/focus; or both.
 - **Compat:** renderer only.
 - **gripeline:** the label-length lint gets softer or goes away.
 
-### B7. Show source text as written
+### ✅ B7. Show source text as written
 
 D1 means the picture shows `echo building $ver` while bash runs
 `echo "building $ver"`. Add an editor display option ("show text as written",
@@ -255,7 +255,7 @@ substitution.
 
 - **Compat:** none (view setting).
 
-### B8. Layered left-to-right auto-layout
+### ✅ B8. Layered left-to-right auto-layout
 
 Nodes with no saved position are placed on a circle in alphabetical order, so
 any `.modl` file opened from disk (no `pos`) draws a pipeline as a ring. Add a
@@ -267,7 +267,7 @@ the default for nodes without saved positions. Saved positions still win.
 - **gripeline:** pipelines look like pipelines. Clusters (B3) lay out as
   nested boxes.
 
-### B9. Highlights in the share-link fragment
+### ✅ B9. Highlights in the share-link fragment
 
 Allow `#h1=…&mark=a,b,L5` (node ids and/or line numbers) to highlight
 elements without changing the source. Must follow the fragment-kit URL
@@ -278,7 +278,7 @@ contracts (`vendor/fragment-kit-*/docs/contracts.md`).
 - **gripeline:** `--annotate --link` prints a share link that highlights the
   problems, as an alternative to writing `foo.annotated.modl`.
 
-### B10. `#gl` syntax highlighting in the editor
+### ✅ B10. `#gl` syntax highlighting in the editor
 
 This was already proposed in MODL_PLAN §7. It is UI code outside the parser
 block. It becomes worth doing once B2/B3 take over most pragma uses.
@@ -314,3 +314,25 @@ adds parity fixtures to gripeline's `tests/` and reruns the modl parity check.
    freed up?
 4. **B5:** should `double` mean stderr in gripeline, or stay a plain data edge
    with stderr still needing a pragma or port?
+
+## Implementation decisions and verification
+
+- A1 uses process substitutions, including both non-default endpoints. Bash
+  does not wait for substitution children. Shared/cyclic nesting and a
+  substituted producer with a second pipe successor report E09, avoiding
+  duplicate execution or silently dropped commands.
+- A8 removes the advertised no-op strict/infer-style flags; whole-line pragmas
+  remain graph-level even inside a block. The harness defaults to the local shim.
+- B3 uses bare braces; pragma blocks remain aliases for this release.
+- B4 keeps hex as a file alias; subroutine emits a program/function call.
+- B5 double routes stderr, unless an explicit port overrides it.
+- B6 uses full text on hover/focus; B7 adds a persistent raw-text view.
+- B10 highlights pragmas in a preview beneath the source editor.
+- Grammar compatibility costs are documented in SPEC §14.4 and modl's new
+  docs-src/pipeline-features.html. CI must consume the companion modl change
+  before the new parser/parity fixtures can pass against the remote checkout.
+
+Regression tests were run failing before the Part A fixes. Final checks cover
+conformance, parser parity, modl unit/integrity/generated-asset checks, native
+Chromium/WebKit browser tests and shared fragment-kit contracts. Firefox could
+not launch its temporary profile in this environment.

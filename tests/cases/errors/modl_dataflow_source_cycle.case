@@ -1,0 +1,12 @@
+name: modl-dataflow-source-cycle
+expect: error
+code: E04
+=== modl ===
+#gl mapping=dataflow
+a -> b sort
+b -> c cat
+c -> a uniq
+=== error ===
+edge a -> b "sort" (line 2)
+edge b -> c "cat" (line 3)
+edge c -> a "uniq" (line 4)

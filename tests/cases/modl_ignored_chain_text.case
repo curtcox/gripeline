@@ -1,0 +1,8 @@
+name: modl-ignored-chain-text
+expect: bash
+=== modl ===
+a square cat x -> b square wc -l
+=== bash ===
+a | b
+=== stderr ===
+"square cat x" after "a" is ignored

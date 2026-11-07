@@ -75,3 +75,10 @@ Run `make check` (the conformance fixtures plus unit tests; Python 3 standard
 library only). [AGENTS.md](AGENTS.md) has the full contributor guide: the
 rules, a code map, and contracts that are easy to break. It is written for
 both people and coding agents.
+
+Modl supports native groups (`ID title {` / `}`), bracket ports
+(`a[err] -> b[3]`), and `double` stderr edges. `note`/`cylinder` are file
+shapes; `hex` remains supported. See SPEC §14.4 for compatibility details.
+Use `./gripeline check --annotate --link file.modl` to print a review link
+on stderr instead of writing an annotated copy. Whole-line `#gl` settings
+always target the graph, even inside a block.

@@ -11,8 +11,7 @@ CLI:
     gripeline check <file>         run only the §9 static check; exit 0 or 65
         --lang=dot|modl            override language detection
         --annotate[=out]           also write a diagnostic-annotated copy
-        --strict                   ordering ambiguity is an error
-        --infer-style              also read recommended visual conventions (off)
+        --link                     with --annotate, print a review URL to stderr
 """
 from __future__ import annotations
 
@@ -150,9 +149,9 @@ RESERVED_SHAPE = {"box": "program", "note": "file", "cds": "stream"}
 
 # modl vocabulary — must match modl's js/editor.js (NODE_SIZES, NODE_SHAPES,
 # EDGE_STYLES, COLORS) exactly; tests/run.py cross-checks against it.
-MODL_SHAPES = {"none", "circle", "square", "diamond", "triangle", "hex"}
+MODL_SHAPES = {"none", "circle", "square", "diamond", "triangle", "hex", "note", "cylinder", "parallelogram", "stadium", "subroutine", "oval"}
 MODL_SIZES = {"tiny", "small", "normal", "big", "bigger", "huge"}
-MODL_LINE_STYLES = {"solid", "dashed", "dotted", "bold"}
+MODL_LINE_STYLES = {"solid", "dashed", "dotted", "bold", "double"}
 MODL_COLORS = {
     "gray", "black", "white", "red", "orange", "yellow",
     "green", "teal", "blue", "purple", "pink", "brown",
@@ -162,6 +161,10 @@ MODL_EDGE_LABEL_MAX = 28
 MODL_ROLE_SHAPES = {
     "square": "program",
     "hex": "file",
+    "note": "file",
+    "cylinder": "file",
+    "parallelogram": "stream",
+    "subroutine": "program",
     "triangle": "stream",
     "diamond": "value",
 }
@@ -483,7 +486,7 @@ def _lex_modl_line(line: str) -> list[ModlPiece]:
                     i = close + 1
                 else:
                     val.append(q)
-                    can_open = False
+                    can_open = q == "["
                     i += 1
             pieces.append(ModlPiece("word", start, i, "".join(val), quoted))
     return pieces
@@ -656,6 +659,9 @@ class ModlParser:
         # lints whose verdict depends on the final mapping: (lineno, kind, msg)
         self._deferred_lints: list[tuple[int, str, str]] = []
         self._lints: list[tuple[int, str]] = []
+        self.source_lines = re.split(r"\r?\n", src)
+        self._line_number = 1
+        self._brace_blocks = []
 
     def nextorder(self) -> int:
         self.order += 1
@@ -668,7 +674,18 @@ class ModlParser:
     def add_e10(self, msg: str):
         self.problems.append(("E10", f"[E10] {msg}"))
 
+    def endpoint(self, w: ModlPiece):
+        line = self.source_lines[self._line_number - 1]
+        if not line[w.start:w.end].endswith("]"):
+            return w, None
+        match = re.fullmatch(r"(.*)\[([^\[\]]*)\]", w.val)
+        if not match:
+            return w, None
+        quoted = line[w.start:w.start+1] in "\"'"
+        return ModlPiece(w.kind, w.start, w.end, match[1], quoted), match[2]
+
     def validate_id(self, w: ModlPiece, lineno: int) -> str:
+        w, _port = self.endpoint(w)
         # modl's idError: quoted ids may hold anything but nothing; the id is
         # the word's value exactly (no whitespace normalization).
         if w.quoted:
@@ -808,6 +825,11 @@ class ModlParser:
                 self.add_e10(f"line {lineno}: #gl begin requires a block id")
                 return
             cid = tokens[1]
+            if cid in self.clusters:
+                self.add_e10(f'line {lineno}: duplicate block id "{cid}" (first opened on line {self.clusters[cid].pos})')
+                # Keep a balanced recovery scope without replacing the original block.
+                self.scope_stack.append(self.current_scope)
+                return
             try:
                 pairs = _parse_kv_pairs(tokens[2:], lineno)
             except ValueError as e:
@@ -910,7 +932,8 @@ class ModlParser:
 
     def parse(self) -> Model:
         # modl splits on \r?\n only (not str.splitlines' wider set).
-        for lineno, line in enumerate(re.split(r"\r?\n", self.src), start=1):
+        for lineno, line in enumerate(self.source_lines, start=1):
+            self._line_number = lineno
             pieces = _lex_modl_line(line)
             comment = next((p for p in pieces if p.kind == "comment"), None)
             pragma_body: str | None = None
@@ -919,11 +942,36 @@ class ModlParser:
             ):
                 pragma_body = comment.val[2:]
 
+            if comment is not None and pragma_body is None and re.match(r"(?:\s+gl\b|GL\s|gl[:=]|gl\S)", comment.val):
+                self._lints.append((lineno, f'line {lineno}: warning: comment looks like a #gl pragma but is ignored (write "#gl key=…")'))
             words = [p for p in pieces if p.kind == "word"]
             has_arrow = any(p.kind == "arrow" for p in pieces)
             if not words and not has_arrow:
                 if pragma_body is not None:
                     self.handle_whole_line_pragma(pragma_body, lineno)
+                continue
+
+            if len(words) == 1 and line[words[0].start:words[0].end] == "}":
+                if not self._brace_blocks:
+                    raise GripError(f"Line {lineno}: unexpected }}")
+                self._brace_blocks.pop()
+                self.handle_whole_line_pragma("end", lineno)
+                continue
+            if not has_arrow and words and not words[-1].quoted and words[-1].val == "{":
+                words = words[:-1]
+                if not words:
+                    raise GripError(f"Line {lineno}: group requires an id")
+                cid = self.validate_id(words[0], lineno)
+                self._parse_node_line(line, words, None, lineno)
+                text = self.nodes[cid].attrs.get("label", "") if cid in self.nodes else ""
+                role = next((v for k,v in self._pragma_pairs(pragma_body, lineno) if k == "role"), None)
+                if role is None:
+                    role = text.split()[0] if text.split() and text.split()[0] in ("for", "while", "until") else "group"
+                body = f"begin {json.dumps(cid)} role={role}"
+                extra = [(k,v) for k,v in self._pragma_pairs(pragma_body, lineno) if k != "role"]
+                body += "".join(f" {k}={json.dumps(v)}" for k,v in extra)
+                self.handle_whole_line_pragma(body, lineno)
+                self._brace_blocks.append(cid)
                 continue
 
             # Background: exactly one unquoted color word and no arrow.
@@ -938,6 +986,8 @@ class ModlParser:
             else:
                 self._parse_node_line(line, words, pragma_body, lineno)
 
+        if self._brace_blocks:
+            raise GripError(f'Unclosed group "{self._brace_blocks[-1]}"')
         if len(self.scope_stack) > 1:
             unclosed = self.scope_stack[-1].cluster
             self.add_e10(f'unbalanced #gl begin "{unclosed}" (missing #gl end)')
@@ -945,6 +995,11 @@ class ModlParser:
         for nid in sorted(self._pragma_only, key=lambda x: self.nodes[x].order):
             nd = self.nodes.pop(nid)
             self.add_e10(f'line {nd.pos}: #gl node "{nid}" names a node that is not in the diagram')
+
+        for cid, text in self._standin_text.items():
+            if text and cid in self.clusters and self.clusters[cid].attrs.get("gl_role") not in ("for", "while", "until"):
+                ln = self.clusters[cid].pos
+                self._lints.append((ln, f'line {ln}: warning: text on block "{cid}" is display-only'))
 
         dataflow = self.graph_attrs.get("gl_mapping", "typed") == "dataflow"
         for lineno, kind, txt in self._deferred_lints:
@@ -1021,12 +1076,14 @@ class ModlParser:
         if a.text is not None:
             raw_text, display_text = _modl_text(line, attr_words, a.text)
 
+        if a.text is not None and any(any(c.isspace() and c not in " \t" for c in line[w.end:(attr_words[i+1].start if i+1 < len(attr_words) else w.end)]) for i, w in enumerate(attr_words) if i >= a.text):
+            self._lints.append((lineno, f'line {lineno}: warning: non-ASCII whitespace in operation text is not shell word separation'))
         self._url_lint(attr_words, a, "command text", lineno)
         self._slot_order_lint(attr_words, a, "node", lineno)
         if len(display_text) > MODL_NODE_LABEL_MAX:
             self._lints.append((lineno,
                 f'line {lineno}: warning: node "{nid}" label is {len(display_text)} chars '
-                f'(modl shows at most {MODL_NODE_LABEL_MAX})'))
+                f'(preview shows {MODL_NODE_LABEL_MAX}; full text on hover/focus)'))
 
         pairs = self._pragma_pairs(pragma_body, lineno)
 
@@ -1065,6 +1122,10 @@ class ModlParser:
         if len(non_empty) < 2:
             raise GripError(f"Line {lineno}: malformed edge line")
 
+        for segment in non_empty[:-1]:
+            if len(segment) > 1:
+                ignored = line[segment[1].start:segment[-1].end]
+                self._lints.append((lineno, f'line {lineno}: warning: "{ignored}" after "{segment[0].val}" is ignored (attributes go after the last id; quote text containing ->)'))
         # Words after the id are attributes only in the last segment.
         endpoint_ids = [self.validate_id(s[0], lineno) for s in non_empty]
         last = non_empty[-1]
@@ -1099,15 +1160,17 @@ class ModlParser:
         if pairs:
             pragma_attrs, tail_port, head_port = self.parse_edge_pragmas(pairs, lineno)
 
+        if a.text is not None and any(any(c.isspace() and c not in " \t" for c in line[w.end:(attr_words[i+1].start if i+1 < len(attr_words) else w.end)]) for i, w in enumerate(attr_words) if i >= a.text):
+            self._lints.append((lineno, f'line {lineno}: warning: non-ASCII whitespace in operation text is not shell word separation'))
         self._url_lint(attr_words, a, "edge text", lineno)
         self._slot_order_lint(attr_words, a, "edge", lineno)
         if len(display_text) > MODL_EDGE_LABEL_MAX:
             self._lints.append((lineno,
                 f"line {lineno}: warning: edge label is {len(display_text)} chars "
-                f"(modl shows at most {MODL_EDGE_LABEL_MAX})"))
+                f"(preview shows {MODL_EDGE_LABEL_MAX}; full text on hover/focus)"))
         if "gl_edge" not in pragma_attrs:
-            if (style or "solid") != "dashed" and raw_text in ("&&", "||"):
-                self._deferred_lints.append((lineno, "solid_control", raw_text))
+            if (style or "solid") != "dashed" and display_text in ("&&", "||"):
+                self._deferred_lints.append((lineno, "solid_control", display_text))
             if style == "dashed":
                 self._deferred_lints.append((lineno, "dataflow_dashed", ""))
 
@@ -1123,14 +1186,15 @@ class ModlParser:
                 edge_attrs.pop("gl_edge", None)
         if raw_text is not None:
             edge_attrs["label"] = raw_text
+            edge_attrs["modl_text"] = display_text
         edge_attrs.update(pragma_attrs)
 
         for i in range(len(endpoint_ids) - 1):
             e = Edge(
                 tail=endpoint_ids[i],
-                tail_port=tail_port,
+                tail_port=tail_port if tail_port is not None else (self.endpoint(non_empty[i][0])[1] or ("err" if style == "double" else None)),
                 head=endpoint_ids[i + 1],
-                head_port=head_port,
+                head_port=head_port if head_port is not None else self.endpoint(non_empty[i+1][0])[1],
                 attrs=dict(edge_attrs),
                 cluster=scope.cluster,
                 order=self.nextorder(),
@@ -1179,6 +1243,7 @@ class Engine:
         self.warnings: list[str] = list(model.warnings)
         self.offending_nodes: set[str] = set()
         self.offending_edges: set[int] = set()
+        self.synthetic_sources = {}
         self.prepared = False
 
     # ----- role & edge-kind resolution -----
@@ -1213,7 +1278,7 @@ class Engine:
         style = e.attrs.get("style")
         if style and self.model.line_styles.get(style) == "control":
             if self.mapping != "dataflow":
-                txt = e.attrs.get("label", "").strip()
+                txt = e.attrs.get("modl_text", e.attrs.get("label", "")).strip()
                 if txt == "&&":
                     return "and"
                 if txt == "||":
@@ -1287,7 +1352,7 @@ class Engine:
             ge = self.edge_kind(e)
             if ge == "invalid_control":
                 loc = f"line {e.pos}: " if self.model.lang == "modl" and e.pos else ""
-                txt = e.attrs.get("label", "").strip()
+                txt = e.attrs.get("modl_text", e.attrs.get("label", "")).strip()
                 self.problems.append(("E11",
                     f'[E11] {loc}dashed edge {e.tail} -> {e.head} has invalid control text "{txt}" (expected &&, ||, or ;)'))
                 if e.pos:
@@ -1325,7 +1390,8 @@ class Engine:
             if te == "file":  # read redirect
                 continue
             if he == "file":  # write redirect
-                fd = port_to_fd(e.tail_port) or 1
+                fd = port_to_fd(e.tail_port)
+                fd = 1 if fd is None else fd
                 redir_fd.setdefault(e.tail, set()).add(fd)
                 continue
             if e.tail == e.head:  # dup
@@ -1342,6 +1408,40 @@ class Engine:
                 continue
             fd_inputs[(e.head, hfd)] = fd_inputs.get((e.head, hfd), 0) + 1
             fd_edges.setdefault((e.head, hfd), []).append(e)
+
+        # Process substitutions must form a forest over ordinary pipe chains.
+        # Reusing an embedded command would execute it twice; a cyclic nesting
+        # cannot be represented by process substitution at all.
+        routed = []
+        normal = []
+        ids = list(self.nodes) + list(self.clusters)
+        routing_uf = UnionFind(ids)
+        for edge in self.edges:
+            if self.edge_kind(edge) is not None or edge.tail == edge.head:
+                continue
+            if self.endpoint_role(edge.tail) in ("file", "value") or self.endpoint_role(edge.head) in ("file", "value"):
+                continue
+            tf, hf = port_to_fd(edge.tail_port), port_to_fd(edge.head_port)
+            tf, hf = 1 if tf is None else tf, 0 if hf is None else hf
+            if (tf, hf) == (1, 0):
+                normal.append(edge)
+                routing_uf.union(edge.tail, edge.head)
+            else:
+                routed.append((edge, hf))
+        nesting, parents = {}, {}
+        invalid_routes = []
+        for edge, hf in routed:
+            parent, child = (edge.tail, edge.head) if hf == 0 else (edge.head, edge.tail)
+            pr, ch = routing_uf.find(parent), routing_uf.find(child)
+            nesting.setdefault(pr, []).append(ch)
+            parents[ch] = parents.get(ch, 0) + 1
+            if pr == ch or parents[ch] > 1 or (hf != 0 and any(e.tail == child for e in normal)):
+                invalid_routes.append(edge)
+        if find_cycle(nesting):
+            invalid_routes.extend(edge for edge, _hf in routed)
+        if invalid_routes:
+            self.problems.append(("E09", '[E09] fd routing requires shared or cyclic process substitutions; use gl_raw'))
+            self.offending_edges.update(e.pos for e in invalid_routes if e.pos)
 
         # E03
         for (node, fd), cnt in fd_inputs.items():
@@ -1394,10 +1494,9 @@ class Engine:
             dadj.setdefault(h, [])
         dcyc = find_cycle(dadj)
         if dcyc and not self.cycle_declared(dcyc):
-            a = dcyc[0]
-            b = dcyc[1] if len(dcyc) > 1 else dcyc[0]
+            cycle_text = " -> ".join(dcyc + [dcyc[0]])
             self.problems.append(("E04",
-                f"[E04] data cycle {a} -> {b} -> {a} without loop/coproc semantics"))
+                f"[E04] data cycle {cycle_text} without loop/coproc semantics"))
             cset = set(dcyc)
             self.offending_nodes.update(cset)
             for e in self.edges:
@@ -1455,6 +1554,18 @@ class Engine:
                     f'[E13] {loc}{what} "{cid}" has an empty body{hint}'))
                 self.offending_nodes.add(cid)
 
+        # Translate internal dataflow names once, after every check has run.
+        for nid in list(self.offending_nodes):
+            if nid in self.synthetic_sources:
+                self.offending_nodes.remove(nid)
+                _name, line, source_node = self.synthetic_sources[nid]
+                if line:
+                    self.offending_edges.add(line)
+                if source_node:
+                    self.offending_nodes.add(source_node)
+        pattern = re.compile(r'(?<![\w])(' + '|'.join(re.escape(n) for n in sorted(self.synthetic_sources, key=len, reverse=True)) + r')(?![\w])') if self.synthetic_sources else None
+        if pattern:
+            self.problems = [(code, pattern.sub(lambda m: self.synthetic_sources[m[0]][0], msg)) for code, msg in self.problems]
         return self.problems
 
     def cycle_declared(self, cyc):
@@ -1564,13 +1675,22 @@ class Engine:
         for k, e in enumerate(old_edges):
             producer_of.setdefault(e.head, []).append(k)
 
+        reserved = set(old_nodes)
+        def fresh(base):
+            name = base
+            while name in reserved:
+                name += "_"
+            reserved.add(name)
+            return name
+
         # one program node per labeled edge
         edge_node_id = {}
         for k, e in enumerate(old_edges):
             label = e.attrs.get("label", "")
-            pid = f"__e{k}"
+            pid = fresh(f"__e{k}")
             pn = Node(id=pid, attrs={"label": label}, role="program",
                       order=no(), pos=e.pos)
+            self.synthetic_sources[pid] = (f'edge {e.tail} -> {e.head} "{label}" (line {e.pos})', e.pos, None)
             # gl_stderr / gl_fd on producer (tail)
             new_nodes[pid] = pn
             edge_node_id[k] = pid
@@ -1601,7 +1721,8 @@ class Engine:
             elif len(prods) >= 2:
                 mid = merge_made.get(x)
                 if mid is None:
-                    mid = f"__merge_{x}"
+                    mid = fresh(f"__merge_{x}")
+                    self.synthetic_sources[mid] = (f'node "{x}"', None, x)
                     new_nodes[mid] = Node(id=mid, attrs={"label": "cat"},
                                           role="op", order=no(), pos=e.pos)
                     for j in prods:
@@ -1732,6 +1853,8 @@ class Engine:
                 if nd.attrs.get("gl_async") == "true":
                     async_flag[u] = True
 
+        routes = []
+        embedded = set()
         pipe_succ = {u: [] for u in units}
         pipe_pred = {u: [] for u in units}
         ctrl_andor = []   # (tail, head, op)
@@ -1785,6 +1908,13 @@ class Engine:
                 continue
             # pipe / fd routing between distinct proc-ish units
             if e.tail in units and e.head in units:
+                tfd, hfd = port_to_fd(e.tail_port), port_to_fd(e.head_port)
+                tfd = 1 if tfd is None else tfd
+                hfd = 0 if hfd is None else hfd
+                if (tfd, hfd) != (1, 0):
+                    routes.append((e.tail, e.head, tfd, hfd))
+                    embedded.add(e.head if hfd == 0 else e.tail)
+                    continue
                 pipe_succ[e.tail].append(e.head)
                 pipe_pred[e.head].append(e.tail)
 
@@ -1793,6 +1923,11 @@ class Engine:
         for u in units:
             for v in pipe_succ[u]:
                 uf.union(u, v)
+        # All members of a substituted pipe chain live inside the substitution.
+        child_roots = {uf.find(h if hf == 0 else t) for t, h, _tf, hf in routes}
+        embedded = {u for u in units if uf.find(u) in child_roots}
+        for t, h, _tf, _hf in routes:
+            uf.union(t, h)
         for vid, (prod, name) in captures.items():
             if vid in units and prod in units:
                 uf.union(vid, prod)
@@ -1812,15 +1947,24 @@ class Engine:
 
         def render_cmd(u, include_writes=True):
             if units[u] == "cluster":
-                return self.render_cluster(u, loop_stdin.get(u))
-            nd = self.nodes[u]
-            base = nd.attrs.get("gl_raw")
-            if base is None:
-                base = self.optext(nd)
+                base = self.render_cluster(u, loop_stdin.get(u))
+            else:
+                nd = self.nodes[u]
+                base = nd.attrs.get("gl_raw")
+                if base is None:
+                    base = self.optext(nd)
             parts = [base] + reads[u]
             if include_writes:
                 parts += writes[u]
             parts += dups[u]
+            for t, h, tf, hf in routes:
+                if t == u and hf == 0:
+                    parts.append(f"{tf}> >({render_downstream(h, set(units))})")
+                elif h == u and hf != 0:
+                    producer = render_upstream(t, set(units))
+                    if tf != 1:
+                        producer += f" {tf}>&1 >/dev/null"
+                    parts.append(f"{hf}< <({producer})")
             return " ".join(p for p in parts if p != "")
 
         def render_downstream(u, comp):
@@ -1880,8 +2024,8 @@ class Engine:
             # fan-in?
             has_fanin = any(is_op[u] and len([v for v in pipe_pred[u] if v in cset]) >= 1
                             for u in comp)
-            sinks = [u for u in comp if not [v for v in pipe_succ[u] if v in cset]]
-            sources = [u for u in comp if not [v for v in pipe_pred[u] if v in cset]]
+            sinks = [u for u in comp if u not in embedded and not [v for v in pipe_succ[u] if v in cset]]
+            sources = [u for u in comp if u not in embedded and not [v for v in pipe_pred[u] if v in cset]]
             if has_fanin and sinks:
                 return render_upstream(sinks[0], cset)
             src = sources[0] if sources else sorted(comp, key=order_of)[0]
@@ -2138,7 +2282,7 @@ def parse_source(src: str, lang: str = "dot") -> Model:
 def read_input_source(path: str) -> str:
     if is_url_arg(path):
         return decode_share_link(path)
-    with open(path) as f:
+    with open(path, newline="") as f:
         return f.read()
 
 
@@ -2183,7 +2327,10 @@ def _format_modl_id(nid: str) -> str:
 def annotate(engine: Engine, path: str, problems, out_path: str):
     src = read_input_source(path)
     if engine.model.lang == "modl":
-        lines = src.splitlines()
+        pieces = re.split(r"(\r?\n)", src)
+        lines = pieces[::2]
+        endings = pieces[1::2]
+        newline = endings[0] if endings else "\n"
         for lineno in sorted(engine.offending_edges):
             meta = engine.model.raw_lines.get(lineno)
             if meta and 1 <= lineno <= len(lines):
@@ -2199,11 +2346,12 @@ def annotate(engine: Engine, path: str, problems, out_path: str):
             engine.offending_nodes,
             key=lambda x: engine.nodes[x].order if x in engine.nodes else 0,
         ):
-            lines.append(f"{_format_modl_id(nid)} red")
+            if nid in engine.model.nodes or nid in engine.model.clusters:
+                lines.append(f"{_format_modl_id(nid)} red")
         for _code, msg in problems:
             lines.append(f"# {msg}")
-        with open(out_path, "w") as f:
-            f.write("\n".join(lines) + "\n")
+        with open(out_path, "w", newline="") as f:
+            f.write("".join(line + (endings[i] if i < len(endings) else newline) for i, line in enumerate(lines)))
         return
 
     # Produce a diagnostic-annotated copy of the dot file. Best-effort: append
@@ -2219,13 +2367,15 @@ def annotate(engine: Engine, path: str, problems, out_path: str):
 
 def main(argv):
     args = argv[1:]
-    flags = {"annotate": None, "strict": False, "infer_style": False, "lang": None}
+    flags = {"link": False, "annotate": None, "strict": False, "infer_style": False, "lang": None}
     rest = []
     for a in args:
         if a == "--strict":
             flags["strict"] = True
         elif a == "--infer-style":
             flags["infer_style"] = True
+        elif a == "--link":
+            flags["link"] = True
         elif a == "--annotate":
             flags["annotate"] = True
         elif a.startswith("--annotate="):
@@ -2263,7 +2413,10 @@ def main(argv):
     for w in engine.warnings:
         print(f"gripeline: {w}", file=sys.stderr)
 
-    if flags["annotate"] and problems:
+    if flags["annotate"] and flags["link"] and problems:
+        marks = sorted(engine.offending_nodes) + [f"L{n}" for n in sorted(engine.offending_edges)]
+        print(encode_share_link(read_input_source(path)) + "&mark=" + urllib.parse.quote(",".join(marks)), file=sys.stderr)
+    elif flags["annotate"] and problems:
         if isinstance(flags["annotate"], str):
             out_path = flags["annotate"]
         else:

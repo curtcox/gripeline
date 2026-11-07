@@ -1,0 +1,10 @@
+name: modl-double
+expect: bash
+=== dot ===
+digraph { a [shape=box,label="make"]; b [shape=box,label="cat"]; a:err -> b; }
+=== modl ===
+a square make
+b square cat
+a -> b double
+=== bash ===
+make 2> >(cat)

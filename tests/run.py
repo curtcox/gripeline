@@ -31,7 +31,8 @@ where <subcmd> defaults to "build" (override with GRIPELINE_SUBCMD; empty = none
 `build` must print the transpiled bash to stdout, run the §9 static check first,
 and exit non-zero with diagnostics on stderr for a non-executable graph.
 
-If GRIPELINE is unset, the transpile/run checks are skipped but dot-valid,
+If GRIPELINE is unset, ./gripeline is used when present; otherwise the
+transpile/run checks are skipped but dot-valid,
 modl-valid, and lint still run, so the fixtures are always validated.
 
 Usage:
@@ -63,7 +64,7 @@ import gripeline as gl_mod  # noqa: E402
 DOT_BIN = shutil.which("dot")
 NODE_BIN = shutil.which("node")
 BASH_BIN = shutil.which("bash") or "/bin/bash"
-GRIPELINE = os.environ.get("GRIPELINE")
+GRIPELINE = os.environ.get("GRIPELINE", "./gripeline" if Path("./gripeline").is_file() else None)
 GRIPELINE_SUBCMD = os.environ.get("GRIPELINE_SUBCMD", "build")
 MODL_REPO = os.environ.get("MODL_REPO")
 if MODL_REPO and not (Path(MODL_REPO) / "js" / "editor.js").is_file():
@@ -275,6 +276,12 @@ def modl_parity_diffs(src: str, js: dict) -> list[str]:
     ge = [(e.tail, e.head, e.attrs.get("style", "solid"), _modl_display(e.attrs.get("label")))
           for e in m.edges]
     je = [(e["from"], e["to"], e["style"], e["text"]) for e in js["edges"]]
+    for edge, parsed in zip(m.edges, js["edges"]):
+        if parsed.get("rawText", "") != edge.attrs.get("label", ""):
+            diffs.append(f"edge {edge.tail} -> {edge.head}: raw source text differs")
+        for key, port in (("fromPort", edge.tail_port), ("toPort", edge.head_port)):
+            if parsed.get(key) is not None and parsed[key] != port:
+                diffs.append(f"edge {edge.tail} -> {edge.head}: {key} differs")
     if ge != je:
         diffs.append(f"edges differ:\n  gripeline={ge}\n  modl     ={je}")
     return diffs

@@ -425,6 +425,20 @@ taking on bash's order-dependent dup semantics in a model that has no order.
 
 ---
 
+### Program fd routing
+
+A program edge with default ports (stdout 1 to stdin 0) emits a pipe.
+Non-default ports use process substitutions: `a:err -> b` emits
+`a 2> >(b)`, `a -> b:3` emits `b 3< <(a)`, and `a:2 -> b:3`
+emits `b 3< <(a 2>&1 >/dev/null)`. An independent stdout pipe remains
+available, for example `a 2> >(b) | c`. Routing is declarative; the
+compiler chooses the required redirect order. Bash does not wait for these
+process substitutions: completion and exit status of their commands are not
+included in the enclosing pipeline's status. Substitutions must form a forest
+over ordinary pipe chains: shared or cyclic nesting, or a substituted producer
+with an additional pipe successor, is rejected as E09; use `gl_raw` for those
+topologies rather than implicitly executing a command twice.
+
 ## 6. Control flow
 
 Pipelines describe *data* dependency. Bash also has *ordering* and *conditional*
@@ -1252,7 +1266,8 @@ values are reported as **E10**.
 
 2. **Whole-line pragmas** stand on their own line:
    - `#gl mapping=commands|dataflow|typed`, `#gl prologue="…"`, `#gl shell=bash`
-     set graph attributes.
+     set graph attributes, including inside an open block; these whole-line
+     keys never target the block.
    - `#gl node ID key=val…` sets attributes on node `ID` without restyling it.
      `ID` must also appear on a modl line (node line or edge endpoint);
      otherwise modl would never draw it, so it is an error (**E10**). The
@@ -1298,3 +1313,45 @@ The `tests/` harness checks the modl front end against modl itself: with
 `MODL_REPO` pointing at a `curtcox/modl` checkout, `tests/modl_parse.cjs` runs
 modl's own `parseSource` and every fixture must parse to the same nodes,
 shapes, text and edges in both.
+
+### 14.4 Native modl extensions
+
+The standalone modl parser (`js/parse.js`) is normative for lexical behavior.
+Words and attributes expose UTF-16 source spans. `a[err] -> b[3]` supplies
+endpoint ports; quoted bracket text is supported. Trailing `from=` / `to=`
+pragmas override bracket ports. A `double` edge defaults its source port to
+stderr; an explicit port or pragma overrides that default.
+
+A node line ending in an unquoted `{` opens a nested group; a line containing
+only `}` closes it. The title supplies a loop header if it starts with
+`for`, `while`, or `until`; otherwise the default role is `group`. A trailing
+pragma on the opener accepts the same block keys as `#gl begin`. The legacy
+`#gl begin` / `#gl end` spelling remains a deprecated alias for this release.
+Membership follows first mention, as for pragma blocks. Reusing a block ID
+is E10. Text on a non-loop group is display-only and produces a warning.
+
+Additional shapes map as follows: `note` and `cylinder` are files,
+`parallelogram` is a stream, and `subroutine` is a program (its operation text
+can call a shell function). `hex` remains a file alias. `stadium` and `oval`
+use the normal default role. Quoted strings immediately after `[` are now recognized by the lexer, including
+in operation text; raw shell slices are preserved, but display quoting there
+can change. New shape/style keywords consume their attribute
+slot where previously they began text; quote such text to preserve its old
+meaning. A bare trailing `{` now opens a group; quote a literal brace.
+
+Quoted control labels use their display text for control classification;
+raw shell text remains unchanged in the dataflow mapping. Warnings also flag
+ignored text in non-final chain segments, near-miss pragma comments, and
+whitespace outside shell quotes other than space/tab. Dataflow diagnostics
+and annotation refer to original source elements, never generated IDs.
+Annotation preserves source line endings and legal quoted line separators.
+
+`--annotate --link` writes a review URL to stderr on static-check failure,
+without writing an annotated file. Its `&mark=...` fragment highlights node
+IDs and `L<number>` source lines, leaving source unchanged. Exit status remains
+65 and failed builds keep stdout empty. The modl editor retains full labels
+on hover/focus, provides a persistent raw-text view, and lays out unsaved nodes
+in deterministic left-to-right layers. Saved positions take precedence.
+
+This CLI does not advertise the unimplemented `--strict` and `--infer-style`
+options; the optional modes described elsewhere remain future capabilities.

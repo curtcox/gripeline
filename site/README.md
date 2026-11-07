@@ -35,3 +35,6 @@ state is — failing conformance cases are shown on the site, not hidden.
 
 > **Enabling Pages:** in the repository settings, set **Settings → Pages →
 > Build and deployment → Source** to **GitHub Actions** (a one-time step).
+
+The current modl parity checks import `js/parse.js` from the modl checkout.
+Use the companion modl changes from MODL_REVIEW_PLAN.md when building locally.

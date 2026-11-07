@@ -1,0 +1,12 @@
+name: modl-duplicate-block
+expect: error
+code: E10
+=== modl ===
+#gl begin g role=subshell
+a square echo 1
+#gl end
+#gl begin g role=group
+b square echo 2
+#gl end
+=== error ===
+duplicate block id "g" (first opened on line 1)

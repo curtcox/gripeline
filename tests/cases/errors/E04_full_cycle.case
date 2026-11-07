@@ -1,0 +1,12 @@
+name: E04-full-cycle
+expect: error
+code: E04
+=== dot ===
+digraph { a [shape=box]; b [shape=box]; c [shape=box]; a -> b -> c -> a; }
+=== modl ===
+a square
+b square
+c square
+a -> b -> c -> a
+=== error ===
+a -> b -> c -> a

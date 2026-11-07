@@ -1,0 +1,10 @@
+name: modl-native-ports
+expect: bash
+=== dot ===
+digraph { a [shape=box,label="make"]; b [shape=box,label="cat"]; a:err -> b:3; }
+=== modl ===
+a square make
+b square cat
+a[err] -> b[3]
+=== bash ===
+cat 3< <(make 2>&1 >/dev/null)

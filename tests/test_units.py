@@ -58,6 +58,12 @@ def words(line: str) -> list[gl.ModlPiece]:
 # Lexer edge cases: each must parse the same in gripeline and in modl.
 # --------------------------------------------------------------------------
 TRICKY = {
+    "quoted bracket id": '"a[err]" square echo hi\n"a[err]" -> b',
+    "native ports": 'a["2>"] -> b[3] double "hi"',
+    "native nested groups": 'g {\nh {\na square echo hi\n}\n}',
+    "native shapes": 'a note in\nb cylinder out\nc parallelogram stream\nd stadium stop\ne subroutine f\nf oval end',
+    "unicode spans": 'a -> b "☕"  "hello"',
+
     "single-quoted hash": "a square echo 'x # y'",
     "double-quoted hash": 'a square echo "x # y"',
     "apostrophe then comment": "a square echo it's # comment",
@@ -155,7 +161,7 @@ class ModlParity(unittest.TestCase):
 
     @needs_modl
     def test_vocabulary_matches_modl(self):
-        src = (Path(MODL_REPO) / "js" / "editor.js").read_text()
+        src = (Path(MODL_REPO) / "js" / "parse.js").read_text()
 
         def js_list(name):
             m = re.search(rf"const {name} = \[([^\]]*)\]", src)
@@ -337,6 +343,84 @@ class EdgeScoping(unittest.TestCase):
         )
         self.assertIn("(\necho one\n) | (\ncat\n)", out)
 
+
+
+class ReviewRegressions(unittest.TestCase):
+    def engine(self, src):
+        e = gl.Engine(gl.parse_modl(src))
+        e.run_checks()
+        return e
+
+    def test_duplicate_block(self):
+        e = self.engine('#gl begin g role=subshell\na square echo 1\n#gl end\n#gl begin g role=group\nb square echo 2\n#gl end')
+        self.assertTrue(any(c == 'E10' and 'duplicate block id "g" (first opened on line 1)' in m for c, m in e.problems))
+
+    def test_ignored_chain_words(self):
+        e = self.engine('a square cat x -> b square wc -l')
+        self.assertTrue(any('"square cat x" after "a" is ignored' in w for w in e.warnings))
+
+    def test_quoted_control(self):
+        e = self.engine('a square true\nb square echo ok\na -> b dashed "&&"')
+        self.assertEqual(e.problems, [])
+        self.assertIn('true && echo ok', e.transpile())
+        e = self.engine('a -> b "&&"')
+        self.assertTrue(any('solid edge' in w for w in e.warnings))
+
+    def test_missing_lints(self):
+        for comment in ('# gl mapping=typed', '#GL mapping=typed', '#gl:mapping=typed', '#glmapping=typed'):
+            self.assertTrue(any('looks like a #gl pragma' in w for w in self.engine(comment).warnings))
+        self.assertTrue(any('non-ASCII whitespace' in w for w in self.engine('a square echo\u00a0hi').warnings))
+        self.assertFalse(any('non-ASCII whitespace' in w for w in self.engine('a square echo "a\u00a0b"').warnings))
+        e = self.engine('g display text\n#gl begin g role=group\na square true\n#gl end')
+        self.assertTrue(any('display-only' in w for w in e.warnings))
+
+    def test_cycle_names_and_annotation(self):
+        src = '#gl mapping=dataflow\na -> b sort\nb -> c cat\nc -> a uniq\n'
+        e = self.engine(src)
+        self.assertTrue(any(c == 'E04' for c, m in e.problems))
+        self.assertNotIn('__e', str(e.problems))
+        self.assertTrue({2, 3, 4} <= e.offending_edges)
+        self.assertFalse(e.offending_nodes - set(e.model.nodes))
+
+    def test_full_cycle(self):
+        e = self.engine('a -> b -> c -> a')
+        self.assertTrue(any('a -> b -> c -> a' in m for c, m in e.problems))
+
+    def test_port_producer_with_upstream_pipe(self):
+        e = self.engine('a square gen\nc square cat\nb square consume\na -> c\nc -> b #gl to=3')
+        self.assertEqual(e.problems, [])
+        self.assertIn('consume 3< <(gen | cat)', e.transpile())
+
+    def test_interdependent_port_routes_are_diagnostic(self):
+        e = self.engine('a square gen\nb square consume\na -> b #gl from=2\na -> b #gl to=3')
+        self.assertTrue(any(c == 'E09' for c,m in e.problems))
+
+    def test_fd_zero_redirect_is_not_stdout(self):
+        e = gl.Engine(gl.parse_dot('digraph { p [shape=box,label="echo ok"]; f [shape=note]; p:0 -> f; p:2 -> p:1; }'))
+        self.assertEqual(e.run_checks(), [])
+
+    def test_review_link_keeps_failed_stdout_empty(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d)/'in.modl'
+            path.write_text('a hex in\nb hex out\na -> b\n')
+            code, out, err = run_cli('check', '--annotate', '--link', str(path))
+            self.assertEqual(code, 65)
+            self.assertEqual(out, '')
+            link = next(line for line in err.splitlines() if line.startswith('https://'))
+            self.assertIn('&mark=', link)
+            self.assertEqual(gl.decode_share_link(link), path.read_text())
+            self.assertFalse((Path(d)/'in.annotated.modl').exists())
+
+    def test_annotation_line_endings(self):
+        src = 'x square "a\fb"\r\ny hex g\r\nz hex h\r\ny -> z\r\n'
+        with tempfile.TemporaryDirectory() as d:
+            path, out = Path(d)/'in.modl', Path(d)/'out.modl'
+            path.write_bytes(src.encode())
+            e = gl.build_engine(str(path))
+            e.run_checks()
+            gl.annotate(e, str(path), e.problems, str(out))
+            result = out.read_bytes().decode()
+            self.assertTrue(result.startswith('x square "a\fb"\r\ny hex g\r\nz hex h\r\ny -> z red\r\n'))
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

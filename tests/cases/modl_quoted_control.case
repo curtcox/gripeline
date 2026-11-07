@@ -1,0 +1,10 @@
+name: modl-quoted-control
+expect: bash
+=== dot ===
+digraph { a [shape=box,label="true"]; b [shape=box,label="echo ok"]; a -> b [gl_edge=and,style=dashed,label="&&"]; }
+=== modl ===
+a square true
+b square echo ok
+a -> b dashed "&&"
+=== bash ===
+true && echo ok

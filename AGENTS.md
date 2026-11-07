@@ -83,7 +83,7 @@ python3 site/build.py                          # build the Pages site into site/
 | [`tests/test_units.py`](tests/test_units.py) | stdlib `unittest`: annotate, id quoting, sniffing, share links, modl parity corpus |
 | [`tests/modl_parse.cjs`](tests/modl_parse.cjs) | runs modl's real parser from `$MODL_REPO` for parity checks |
 | [`site/build.py`](site/build.py) | builds the GitHub Pages site (spec with rendered SVGs + per-test pages) |
-| [`MODL_REVIEW_PLAN.md`](MODL_REVIEW_PLAN.md) | **current backlog**: Part A (gripeline bugs A1–A8), Part B (modl enhancements B1–B10). Not implemented yet |
+| [`MODL_REVIEW_PLAN.md`](MODL_REVIEW_PLAN.md) | implementation record: Part A fixes and Part B modl enhancements (implemented in the sibling modl checkout) |
 | [`MODL_PLAN.md`](MODL_PLAN.md) | design record for the modl front end. Implemented. Decision 1 is superseded |
 | [`IMPLEMENTATION_PROMPT.md`](IMPLEMENTATION_PROMPT.md) | the original brief used to build the transpiler. **Historical**: the work is done. Don't treat its "You are implementing…" as your task |
 
@@ -118,7 +118,7 @@ to find them. In pipeline order:
 - **Diagnostics** go to stderr and contain the error code (`E04`, …). Error
   fixtures match on the code and on substrings of the message, so rewording a
   message can break them.
-- **`build` emits nothing on stdout** when the static check fails.
+- **`build` emits nothing on stdout** when the static check fails. `--annotate --link` prints a review URL on stderr instead of writing a file.
 - **Output comparison** strips blank lines, `#` comments, prologue lines, and
   leading and trailing whitespace on each line (`normalize_bash` in
   `tests/run.py`). Formatting is free, but the statements themselves must

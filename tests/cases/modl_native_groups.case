@@ -1,0 +1,10 @@
+name: modl-native-groups
+expect: contains
+=== modl ===
+each for x in a b {
+  a square echo "$x"
+}
+=== bash ===
+for x in a b; do
+echo "$x"
+done

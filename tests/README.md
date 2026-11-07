@@ -53,7 +53,8 @@ defaults to `build` (override via `GRIPELINE_SUBCMD`; set it empty to omit).
 `build` must print the transpiled bash to stdout, run the §9 static check first,
 and exit non-zero with diagnostics on stderr for a non-executable graph.
 
-**Without** `GRIPELINE` set, the transpile/run checks are skipped but every case
+**Without** `GRIPELINE` set, the runner defaults to `./gripeline` when present.
+Otherwise transpile/run checks are skipped but every case
 is still validated for dot/modl validity and (for exact cases) bash-lint — so the
 fixtures themselves are always checked.
 

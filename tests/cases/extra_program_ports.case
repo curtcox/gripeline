@@ -1,0 +1,15 @@
+name: extra-program-ports
+expect: bash
+=== dot ===
+digraph {
+ a [shape=box,label="make"]; b [shape=box,label="cat"]; c [shape=box,label="wc"];
+ a:err -> b; a -> c;
+}
+=== modl ===
+a square make
+b square cat
+c square wc
+a -> b #gl from=err
+a -> c
+=== bash ===
+make 2> >(cat) | wc
