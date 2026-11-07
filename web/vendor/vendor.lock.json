@@ -50,17 +50,17 @@
   },
   {
     "repo": "https://github.com/curtcox/modl",
-    "commit": "4667a5b12a6feb54ccf553452ce50f6779b9b9dc",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
     "path": "js/parse.js",
-    "url": "https://raw.githubusercontent.com/curtcox/modl/4667a5b12a6feb54ccf553452ce50f6779b9b9dc/js/parse.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/js/parse.js",
     "target": "modl/parse.js",
     "sha256": "587fda4548814761f62620f4ac8b5a91ade0606eaa5b3fa52e9162ef343da074"
   },
   {
     "repo": "https://github.com/curtcox/modl",
-    "commit": "4667a5b12a6feb54ccf553452ce50f6779b9b9dc",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
     "path": "js/diagram-features.js",
-    "url": "https://raw.githubusercontent.com/curtcox/modl/4667a5b12a6feb54ccf553452ce50f6779b9b9dc/js/diagram-features.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/js/diagram-features.js",
     "target": "modl/diagram-features.js",
     "sha256": "fea251f948d17b9984528dcc10b1edd3b04282848882bc55851660d561e3ba19"
   },
@@ -95,5 +95,349 @@
     "url": "https://raw.githubusercontent.com/mdaines/viz-js/f45ae4f06e965e42d7c048f467e5585864c78114/LICENSE",
     "target": "LICENSE-viz",
     "sha256": "28d1d05bd2cf402278ac4233b0656616fe386650e2d978aed11db66c53a51ef4"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "js/render.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/js/render.js",
+    "target": "modl/render.js",
+    "sha256": "20f8a8d7421d4204a59c1a5e33c092b181e1f87fb6c3063b581b635262ce8a7b"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/LICENSE",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/LICENSE",
+    "target": "fragment-kit-v0.3.4/LICENSE",
+    "sha256": "4b98ca359e198179443e1cd7c604f6cc579e7879122583352fbaa1bddb11ae53"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/manifest.json",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/manifest.json",
+    "target": "fragment-kit-v0.3.4/manifest.json",
+    "sha256": "ecfb7ef164195a6098d256f759162f995480a370c813b30b00d6ded423e15628"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/core/bytes.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/core/bytes.js",
+    "target": "fragment-kit-v0.3.4/src/core/bytes.js",
+    "sha256": "9199997bd3d140ce63246fd78ba9eabc0955aa782197fdf2b6334c2d2cf8119d"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/core/cid.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/core/cid.js",
+    "target": "fragment-kit-v0.3.4/src/core/cid.js",
+    "sha256": "de418479e0c32209e751df3e479315ca2d26c29cc17a0c0331837430d761ebdd"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/core/compression.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/core/compression.js",
+    "target": "fragment-kit-v0.3.4/src/core/compression.js",
+    "sha256": "2c42d820cbb717290d81fcd0619f1f3932a051299a5dd749704299346b5f6152"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/core/config.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/core/config.js",
+    "target": "fragment-kit-v0.3.4/src/core/config.js",
+    "sha256": "c6b6fbafaf32d877a4226b14fd91b3f9d43855d1647f69651eeb8b920ee6579b"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/core/envelope.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/core/envelope.js",
+    "target": "fragment-kit-v0.3.4/src/core/envelope.js",
+    "sha256": "10f78b50012ed4ae86de10976c42f8eba7918164c8a129462745d159de3cbd05"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/core/scheduler.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/core/scheduler.js",
+    "target": "fragment-kit-v0.3.4/src/core/scheduler.js",
+    "sha256": "1d82eb2faabfac93c49cb56754137093f256621850746fe9ce4b687d21883051"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/core/storage.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/core/storage.js",
+    "target": "fragment-kit-v0.3.4/src/core/storage.js",
+    "sha256": "9834941e8c12589bd64604e6829eb2001da8597ef643c99deefa6fe0d71b679b"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/core/url-state.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/core/url-state.js",
+    "target": "fragment-kit-v0.3.4/src/core/url-state.js",
+    "sha256": "5cd6bc5fcf217805fa463c7829441f265e77dbd98c210660b6dfbe6df238d6de"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/drafts/local-drafts.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/drafts/local-drafts.js",
+    "target": "fragment-kit-v0.3.4/src/drafts/local-drafts.js",
+    "sha256": "dce89cc0ceebc61f1d88c3fd3533ee2433ae96a844030549d71d47b4e80f7f29"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/gallery/gallery.css",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/gallery/gallery.css",
+    "target": "fragment-kit-v0.3.4/src/gallery/gallery.css",
+    "sha256": "43cb07d408934dd43650a3aff6c776f353d2b75a76b8458460306a4f5319ca73"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/gallery/gallery.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/gallery/gallery.js",
+    "target": "fragment-kit-v0.3.4/src/gallery/gallery.js",
+    "sha256": "7780ae0ab5ac6b858acb946eff1a6f3f992c8bdff375257689e5b738ee87c71f"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/globals.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/globals.js",
+    "target": "fragment-kit-v0.3.4/src/globals.js",
+    "sha256": "b6983ed34fab0b7f7a07587424334d669bf46a61d32db838789ee5715cc9b81c"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/hashbin/panel.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/hashbin/panel.js",
+    "target": "fragment-kit-v0.3.4/src/hashbin/panel.js",
+    "sha256": "8cad688e63e51f0a54e2e1ad611a00998c88ef4e0d3de54e7b6ef07f7c26fffb"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/hashbin/store.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/hashbin/store.js",
+    "target": "fragment-kit-v0.3.4/src/hashbin/store.js",
+    "sha256": "dcc8368ea81602770142a42f59407a7bf1e52d835e92c543a3e8dc15238f5b19"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/index.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/index.js",
+    "target": "fragment-kit-v0.3.4/src/index.js",
+    "sha256": "4505c163cb84339c9d7880e2a4c5c1b9f50e181c4f0abb970c193ed75f0e57fc"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/offline/client.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/offline/client.js",
+    "target": "fragment-kit-v0.3.4/src/offline/client.js",
+    "sha256": "994eb6681466b04a61d07873f028d1b864b9ad0bfccf4deba9d3d773f393c524"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/offline/sw-core.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/offline/sw-core.js",
+    "target": "fragment-kit-v0.3.4/src/offline/sw-core.js",
+    "sha256": "2f291202696a546d78f2d5cf4c5801e2eded80f53cc8b9a69aec52b684326677"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/qr/accept.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/qr/accept.js",
+    "target": "fragment-kit-v0.3.4/src/qr/accept.js",
+    "sha256": "da6e7e4cfef6c63a8c67071b26d5fa4f64b5af8402a388602af95c0f1307c263"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/qr/decoder.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/qr/decoder.js",
+    "target": "fragment-kit-v0.3.4/src/qr/decoder.js",
+    "sha256": "73901adcd9438a1bf4ae58143474c6f1aa344de18ec91cc918300be63538cfcf"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/qr/encode.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/qr/encode.js",
+    "target": "fragment-kit-v0.3.4/src/qr/encode.js",
+    "sha256": "b2e2001f5c7b0b9d0e9b17bcebb154843edd06688d9ad59aab652d4f29aca505"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/qr/qr-dialog.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/qr/qr-dialog.js",
+    "target": "fragment-kit-v0.3.4/src/qr/qr-dialog.js",
+    "sha256": "ebfeb6eb8028e6bb1c75fdfa66500564075c4be46c1199c71b58bd098544d3ee"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/qr/scan.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/qr/scan.js",
+    "target": "fragment-kit-v0.3.4/src/qr/scan.js",
+    "sha256": "eebae6891ac5e12c57d072af12348065b7d9f86b7a57cf84d8d0d3e1c8c00d20"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/share/share-dialog.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/share/share-dialog.js",
+    "target": "fragment-kit-v0.3.4/src/share/share-dialog.js",
+    "sha256": "da8336c608551575d23d4315a1f6a6b7cc63df9c7a7fa2042c49a60bf5e8c2cb"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/share/shortener.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/share/shortener.js",
+    "target": "fragment-kit-v0.3.4/src/share/shortener.js",
+    "sha256": "3388494cd4729d147b4b1fcc7351e43b9617b3323075f0cd402a61e0a83ed8f7"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/ui/dialog.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/ui/dialog.js",
+    "target": "fragment-kit-v0.3.4/src/ui/dialog.js",
+    "sha256": "1a58108a16eee71df69207c89aa43af268a13d5fd9cb4f33e8738bed10bec1f2"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/ui/kit.css",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/ui/kit.css",
+    "target": "fragment-kit-v0.3.4/src/ui/kit.css",
+    "sha256": "d9067d56ed42ce15cb7737bc1a43926e2c9f4a114dde08c136d8ab7ba0e81042"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/ui/mobile-tabs.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/ui/mobile-tabs.js",
+    "target": "fragment-kit-v0.3.4/src/ui/mobile-tabs.js",
+    "sha256": "a811609cda57e2959a871756a719a4f25b83c71cbaf0fe3bbf5eed8a04818f32"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/src/ui/shell.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/src/ui/shell.js",
+    "target": "fragment-kit-v0.3.4/src/ui/shell.js",
+    "sha256": "0cfbcf9067ec25e9486541f7f1c7f67e9053253dad5c560fee7ff050c68ead4c"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/LICENSE-graphvizonline",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/LICENSE-graphvizonline",
+    "target": "fragment-kit-v0.3.4/vendor/LICENSE-graphvizonline",
+    "sha256": "4ee8a9de2b6edcf927a4d1f6063d47c0dd7eba2ac566c040be82917404e5964f"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/LICENSE-hashbin",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/LICENSE-hashbin",
+    "target": "fragment-kit-v0.3.4/vendor/LICENSE-hashbin",
+    "sha256": "4b98ca359e198179443e1cd7c604f6cc579e7879122583352fbaa1bddb11ae53"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/LICENSE-jsQR",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/LICENSE-jsQR",
+    "target": "fragment-kit-v0.3.4/vendor/LICENSE-jsQR",
+    "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/LICENSE-lz-string",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/LICENSE-lz-string",
+    "target": "fragment-kit-v0.3.4/vendor/LICENSE-lz-string",
+    "sha256": "433fc9dfe659dbfb1e91eed8351f13651e97bfa3ac6d03394c3d63f61d4bbc80"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/PROVENANCE.md",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/PROVENANCE.md",
+    "target": "fragment-kit-v0.3.4/vendor/PROVENANCE.md",
+    "sha256": "a0d6111d1bbe71086fc211bceeba419d52de1dcc8a2dc4b1febc5ee0f203fab4"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/hashbin-sdk-v0.4.0.mjs",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/hashbin-sdk-v0.4.0.mjs",
+    "target": "fragment-kit-v0.3.4/vendor/hashbin-sdk-v0.4.0.mjs",
+    "sha256": "82f25ffe41a0ff79a060fb593754a286e1c85c2502878ab387c3d0045b749fa5"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/integrity.json",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/integrity.json",
+    "target": "fragment-kit-v0.3.4/vendor/integrity.json",
+    "sha256": "e118f3b87d5052558b0403fd74d3ade5b146697fbd08f5cc171c7df8f57098bf"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/jsqr/jsQR-fk.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/jsqr/jsQR-fk.js",
+    "target": "fragment-kit-v0.3.4/vendor/jsqr/jsQR-fk.js",
+    "sha256": "551bae92930708f031a8531e80e30f22c56e9dea27c33f4c2c146cde8e4cc40b"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/jsqr/jsQR.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/jsqr/jsQR.js",
+    "target": "fragment-kit-v0.3.4/vendor/jsqr/jsQR.js",
+    "sha256": "bc40c8a15196236b2314db0856f72ca0b49980cd5413b8c852a7349f5fee0859"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/jsqr/package.json",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/jsqr/package.json",
+    "target": "fragment-kit-v0.3.4/vendor/jsqr/package.json",
+    "sha256": "5f4b2aaf2cea32c3fcca55067df5b5d8f9a5b58a05a84f4e2fdc87b275b3d9f3"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/lz-string-1.5.0.js",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/lz-string-1.5.0.js",
+    "target": "fragment-kit-v0.3.4/vendor/lz-string-1.5.0.js",
+    "sha256": "95f4d1cbf099f57161b664bc048426ec3df92637801a4c79116e83315aa787e7"
+  },
+  {
+    "repo": "https://github.com/curtcox/modl",
+    "commit": "26879336555950c0b3efb446dbc9b55c22828813",
+    "path": "vendor/fragment-kit-v0.3.4/vendor/lz-string-1.5.0.mjs",
+    "url": "https://raw.githubusercontent.com/curtcox/modl/26879336555950c0b3efb446dbc9b55c22828813/vendor/fragment-kit-v0.3.4/vendor/lz-string-1.5.0.mjs",
+    "target": "fragment-kit-v0.3.4/vendor/lz-string-1.5.0.mjs",
+    "sha256": "8d9eea78bc561e73090ba11a3bd0e20b322958841e218acb49e82fc00f929b2c"
   }
 ]

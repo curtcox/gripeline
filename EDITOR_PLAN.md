@@ -1,24 +1,25 @@
 # Editor and run-anywhere plan
 
-Status: **partially implemented locally** (2026-11-07). No release or deployment
-has been made. This implementation does not yet meet every phase's acceptance
+Status: **implementation in progress** (2026-11-07). Compiler and editor changes
+are pushed to Pages; t256 v0.1.0 is released. This implementation does not yet meet every phase's acceptance
 criteria.
 
 | phase | current implementation | remaining acceptance work |
 |---|---|---|
-| 0 | Pure API shared by CLI and worker; stdin/CID input; envelope unwrapping; Bash discovery; Windows launchers/installers; 3-OS CI matrix | Run the new CI jobs on Linux and Windows (local verification was macOS); verify native Windows install/run |
-| 1 | Four-pane responsive editor; self-hosted Pyodide; Graphviz; vendored modl parser/layout; draggable SVG preview; live checks and marks; h1 links; reviewed local command; downloads; fixture gallery; Chromium fixture/API parity tests | Extract and consume modl's actual standalone renderer rather than the temporary `web/src/modl-render.js` adapter; Fragment Kit shell/mobile tabs, QR, drafts and offline integration remain outstanding |
+| 0 | Pure API shared by CLI and worker; stdin/CID input; envelope unwrapping; Bash discovery; Windows launchers/installers; 3-OS CI matrix | CI passes on Linux, macOS and Windows. Native macOS CID execution verified with the checksummed t256 release; verify the Windows installer/run round trip |
+| 1 | Four-pane responsive editor; self-hosted Pyodide; Graphviz; vendored modl parser/layout; draggable SVG preview; live checks and marks; h1 links; reviewed local command; downloads; fixture gallery; Chromium fixture/API parity tests | Shared renderer extracted and pushed to modl; pinned renderer consumed by editor. Fragment Kit shell, mobile tabs, sharing, QR, explicit unverified draft recovery and verified offline reload are implemented. Chromium passes; Firefox/WebKit not yet run |
 | 2 | t256 producers/sinks, canonical CID validation, guard, E14, twin fixtures and spec | No remaining local compiler work identified |
-| 3 | Tested txtar builder, exact compiler embedding, local t256 configuration/store embedding, CID verification, compression and size/delimiter guards | The sibling 256t.org checkout now has the linux/386 release target and a required Linux 386 CI test job; the binary cross-build was verified locally. Still needed: release, verified binary pin, Apptron overlay release and real VM boot test. Run in Apptron is deliberately disabled until these exist |
+| 3 | Tested txtar builder, exact compiler embedding, local t256 configuration/store embedding, CID verification, compression and size/delimiter guards | t256 v0.1.0 published with a verified linux/386 binary. Apptron overlay, binary pin, release-input fingerprints and boot test are being implemented. Still needed: Apptron runtime release and real VM boot test. Run in Apptron is deliberately disabled until these exist |
 | 4 | Verified CID load and CID-based local command generation | HashBin Publish registration and save UI; dedicated origin and canonical/mirror migration; native round-trip on all OSes |
 | 5 | requires/env syntax, missing-tool guards, --portable advice, conservative declaration badges | Validated per-environment tool inventories, complete target disabling, portable t256 gallery executed on every OS and in the VM |
 
-Verification: `make check` (86 fixtures, 43 unit tests), site build, vendored
-asset verification, 4 Node contract tests and 3 Chromium Playwright tests.
+Verification: `make check` (86 fixtures, 44 unit tests), site build, vendored
+asset verification, 5 Node contract tests and 7 Chromium Playwright tests. Modl
+passes 33 unit tests, native Chromium zoom/drag/export checks and all 17 shared
+Fragment Kit contracts.
 Graphviz and sibling modl parity tools were available locally. The browser
 suite checks every fixture against Python, plus errors, reviewed commands,
-links that do not execute, and a 390px viewport. Other browsers and operating
-systems have not been run.
+links that do not execute, and a 390px viewport. Other browsers have not been run. CI now covers all three operating systems.
 
 Continue with the upstream runtime releases and renderer extraction before
 claiming the complete run-anywhere plan is done.

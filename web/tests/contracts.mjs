@@ -35,3 +35,11 @@ test('local CID command has shell-independent quoting',()=>{
   assert.equal(localCommand('src',{},'AAAAAAAA'),'gripeline run "t256:AAAAAAAA"');
   assert.match(shareLink('a square echo hi',{},'https://example.com/editor/'),/#h1=/);
 });
+test('oversized referenced content is rejected before a network fetch',async()=>{
+  const previous=globalThis.fetch;
+  try{
+    globalThis.fetch=async()=>{throw Error('unexpected network fetch');};
+    const cid=encode64(new Uint8Array([0,0,0,32,0,0]))+encode64(new Uint8Array(64));
+    await assert.rejects(apptronSnapshot('a square cat','modl','python',[cid]),/1 MiB/);
+  }finally{globalThis.fetch=previous;}
+});

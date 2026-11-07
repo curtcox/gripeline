@@ -39,9 +39,10 @@ state is — failing conformance cases are shown on the site, not hidden.
 The current modl parity checks import `js/parse.js` from the modl checkout.
 Use the companion modl changes from MODL_REVIEW_PLAN.md when building locally.
 
-The build also copies `web/` and the current `gripeline.py` to `_site/editor/`
+The build copies public files from `web/` and the current `gripeline.py` to `_site/editor/`
 and generates `editor/gallery.json` from every fixture source. Browser runtime
 assets are checked in under `web/vendor/`; run `python3 scripts/vendor.py`
 before building to verify the lock. `python3 scripts/vendor.py --fetch` restores
-missing assets and rejects hash mismatches. No browser dependency installation
+missing assets and rejects hash mismatches. Tests, dependency installations and
+browser traces are excluded; an offline manifest pins every deployed editor asset. No browser dependency installation
 is needed by `make check` or the site builder.

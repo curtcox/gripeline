@@ -26,6 +26,7 @@ diagrams degrade to a "source only" note.
 from __future__ import annotations
 
 import html
+import hashlib
 import json
 import os
 import re
@@ -670,8 +671,15 @@ def main(argv: list[str]) -> int:
     print(f"build: dot     -> {DOT_BIN or 'NOT FOUND (diagrams degrade)'}")
     print(f"build: gripeline -> {os.environ.get('GRIPELINE')}")
 
-    shutil.copytree(ROOT / 'web', out_dir / 'editor', dirs_exist_ok=True)
-    shutil.copyfile(ROOT / 'gripeline.py', out_dir / 'editor' / 'gripeline.py')
+    editor_dir = out_dir / 'editor'
+    if editor_dir.exists():
+        shutil.rmtree(editor_dir)
+    editor_dir.mkdir()
+    for name in ('index.html', 'service-worker.js'):
+        shutil.copyfile(ROOT / 'web' / name, editor_dir / name)
+    for name in ('src', 'vendor'):
+        shutil.copytree(ROOT / 'web' / name, editor_dir / name)
+    shutil.copyfile(ROOT / 'gripeline.py', editor_dir / 'gripeline.py')
     gallery = []
     for path in sorted((TESTS_DIR / 'cases').rglob('*.case')):
         case = harness.parse_case(path)
@@ -679,7 +687,13 @@ def main(argv: list[str]) -> int:
             src = getattr(case, lang)
             if src:
                 gallery.append(dict(name=case.name + ' (' + lang + ')', src=src, lang=lang))
-    (out_dir / 'editor' / 'gallery.json').write_text(json.dumps(gallery), encoding='utf-8')
+    (editor_dir / 'gallery.json').write_text(json.dumps(gallery), encoding='utf-8')
+    hashes = {path.relative_to(editor_dir).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in sorted(editor_dir.rglob('*')) if path.is_file()}
+    fingerprint = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()[:16]
+    offline = dict(prefix='gripeline-offline', version='gripeline-offline-' + fingerprint,
+                   assets=list(hashes), hashes=hashes)
+    (editor_dir / 'offline-assets.js').write_text('self.OfflineAssets = ' + json.dumps(offline) + ';\n', encoding='utf-8')
     stats = build_test_pages(out_dir)
     build_spec_page(out_dir)
     build_index_page(out_dir, stats)

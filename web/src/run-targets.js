@@ -9,7 +9,10 @@ export function download(content,name,type='text/plain') {
 }
 export async function apptronSnapshot(src,lang,python,references=[]) {
   const entries=[['.apptron/envrc',`cd /project\nexport T256_CONFIG=/project/.t256/config.json\npython3 gripeline.py check pipeline.${lang} && echo "Try: python3 gripeline.py run pipeline.${lang}"\n`],[`pipeline.${lang}`,src],['gripeline.py',python],['.t256/config.json',JSON.stringify({providers:{local:{type:'dir',path:'/project/.t256/store',create:true}},sources:['local'],destination:'local'})]];
-  for(const cid of new Set(references))if(parseCID(cid).length>64) {
+  const stored=[...new Set(references)].map(reference=>parseCID(reference)).filter(ref=>ref.length>64);
+  const estimate=new TextEncoder().encode(src+python).length+4096+stored.reduce((sum,ref)=>sum+Math.ceil(ref.length/3)*4+ref.cid.length+64,0);
+  if(estimate>1048576)throw Error('Snapshot exceeds Apptron’s 1 MiB limit. Use a smaller dataset or configure a relay in Apptron.');
+  for(const {cid} of stored) {
     const data=await loadCID(cid);
     // txtar's base64 encoding is standard padded base64, not base64url.
     let binary='';for(const byte of data)binary+=String.fromCharCode(byte);

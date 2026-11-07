@@ -21,15 +21,19 @@ npx playwright install chromium
 npm test
 ```
 
-The editor stores no drafts, credentials, settings, or relay configuration.
+Drafts are saved locally and recovered only through an explicit Resume action.
+Recovered drafts are marked unverified; links never automatically restore them.
+The editor stores no credentials, execution commands, or relay configuration.
 Explicit links are checked before enabling local execution commands; opening
 one never runs a pipeline. CID loads verify length and SHA-512 before decoding.
 Bash must be reviewed in the local-run dialog before copying its command.
 
-`src/modl-render.js` is a temporary preview adapter over modl's pinned parser
-and layout helpers; it is not the extracted upstream renderer. It does not yet
-support all of modl's image, style, zoom, and pan behavior. Apptron snapshot
-helpers are tested but the Run target stays disabled until the required
-upstream overlay has a verified release. HashBin publishing, offline caching,
-QR and Fragment Kit shell/draft integration are still pending. See
-`../EDITOR_PLAN.md` for the complete phase status.
+`src/modl-render.js` embeds modl's standalone `renderDiagram` from pinned,
+byte-identical vendor files. Host callbacks provide dragging, panning and zoom;
+links use safe HTTP(S) navigation. The Fragment Kit shell supplies mobile tabs,
+sharing, QR, draft recovery and verified offline caching. The site builder
+includes only public editor assets and generates the offline hash manifest.
+
+The Apptron target remains disabled until the required overlay's runtime
+release passes its real VM boot check. HashBin publishing and canonical-origin
+migration still require app registration. See `../EDITOR_PLAN.md` for status.
