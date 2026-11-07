@@ -2,7 +2,7 @@ import {createConfig,createShell,mountMobileTabs,createShareDialog,createQrDialo
 import {shareLink,decode64,unwrapDiagram,parseCID} from './cid.js';
 export function mountWorkspace({getSnapshot,onLoad,onPreview,onRestore}) {
   const current=new URL(location.href);current.hash='';current.search='';current.pathname=current.pathname.replace(/index\.html$/,'');
-  const config=createConfig({slug:'gripeline',name:'gripeline',storagePrefix:'gripeline',canonicalOrigin:'https://curtcox.github.io/gripeline/editor/',recoveryOrigin:current.href,repo:'curtcox/gripeline',docs:new URL('../spec.html',current).href,gallery:current.href,documentType:'modl',maxBytes:1048576});
+  const config=createConfig({slug:'gripeline',name:'gripeline',storagePrefix:'gripeline',canonicalOrigin:'https://gripeline.hashbin.page/',recoveryOrigin:current.href,repo:'curtcox/gripeline',docs:'https://curtcox.github.io/gripeline/spec.html',gallery:current.href,documentType:'modl',maxBytes:1048576});
   const original=document.querySelector('body>header'),shell=createShell({config});
   shell.header.append(document.getElementById('status'));shell.toolbar.append(document.getElementById('share'));original.remove();
   shell.offlineStatus.textContent='Preparing offline copy…';shell.draftStatus.textContent='Links never run automatically';

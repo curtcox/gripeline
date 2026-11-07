@@ -26,9 +26,10 @@ export async function apptronSnapshot(src,lang,python,references=[]) {
   if(new TextEncoder().encode(snapshot).length>1048576)throw Error('Snapshot exceeds Apptron’s 1 MiB limit. Use a smaller dataset or configure a relay in Apptron.');
   return snapshot;
 }
-export async function apptronLink(snapshot) {
+export async function apptronLink(snapshot,base='https://apptron.hashbin.page/') {
+  if(!['https://apptron.hashbin.page/','https://curtcox.github.io/apptron/'].includes(base))throw Error('Unknown Apptron origin');
   const {default:LZString}=await import('../vendor/lz-string.mjs');
-  const url='https://curtcox.github.io/apptron/?compressed='+LZString.compressToEncodedURIComponent(snapshot);
-  if(url.length>60000)throw Error('Snapshot link is too long. Download a .txtar snapshot until HashBin publishing is configured.');
+  const url=base+'?compressed='+LZString.compressToEncodedURIComponent(snapshot);
+  if(url.length>60000)throw Error('Snapshot link is too long. Save the snapshot to HashBin or download its .txtar file.');
   return url;
 }

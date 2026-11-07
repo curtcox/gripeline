@@ -115,8 +115,11 @@ uploads). CID syntax and content verification use t256's SHA-512 identifiers.
 The Apptron target verifies its pinned runtime manifest and gripeline overlay before
 enabling a handoff. The snapshot includes the exact compiler that checked the source;
 opening it performs a static check and offers a command to run explicitly.
-HashBin publishing and a canonical dedicated origin require external app
-registration. See [EDITOR_PLAN.md](EDITOR_PLAN.md) for current phase status.
+The canonical editor is prepared at [gripeline.hashbin.page](https://gripeline.hashbin.page/).
+HashBin save controls use hosted per-save review and verify the returned CID.
+Saving stays disabled until its public client registration is complete; the shared
+Pages mirror always disables publishing. Oversized Apptron links can be downloaded
+as snapshots or saved for an Apptron CID handoff. See [EDITOR_PLAN.md](EDITOR_PLAN.md) for current phase status.
 
 The editor's environment badges combine declared requirements with first command
 words. Baseline inventories are in `web/portable-tools.json`; native targets

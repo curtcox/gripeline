@@ -46,3 +46,10 @@ before building to verify the lock. `python3 scripts/vendor.py --fetch` restores
 missing assets and rejects hash mismatches. Tests, dependency installations and
 browser traces are excluded; an offline manifest pins every deployed editor asset. No browser dependency installation
 is needed by `make check` or the site builder.
+
+
+The editor's canonical dedicated host is prepared at `https://gripeline.hashbin.page/`.
+HashBin's owned-app workflow stages only `site/_site/editor/` assets named by the
+compiler-generated offline manifest. The Pages spec and conformance pages retain
+their editor links. Public client registration controls canonical publishing; the
+shared Pages editor never publishes or stores HashBin credentials.

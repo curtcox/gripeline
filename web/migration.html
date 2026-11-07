@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Move saved work — HashBin apps</title>
+<style>body{max-width:640px;margin:48px auto;padding:0 20px;font:17px/1.6 system-ui;color:#172b2b}button,input{font:inherit;margin:8px 8px 8px 0;padding:8px}button{cursor:pointer}#migration-status{padding:16px;background:#edf6f5;border-radius:8px}a{color:#12675e}</style></head>
+<body data-migration-app="gripeline"><h1>Move your saved work</h1><p id="migration-app"></p>
+<p>Use <strong>Move saved work</strong> in the <a id="migration-old">old app</a>, or select a downloaded backup. The transfer runs in your browser and does not publish your backup to HashBin. HashBin credentials and Python filesystem permissions are not copied.</p>
+<label>Backup file <input id="migration-file" type="file" accept="application/json,.json"></label>
+<p id="migration-status" role="status">Waiting for the old app or a backup file.</p>
+<button id="migration-restore" disabled>Restore and open app</button><button id="migration-download">Download backup</button>
+<script type="module" src="src/domain-migration.js"></script></body></html>

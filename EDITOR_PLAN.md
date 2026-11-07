@@ -3,22 +3,27 @@
 Status: **implementation in progress** (2026-11-07). Compiler, editor, native
 installers and the Apptron overlay are committed and pushed. t256 v0.1.0 and
 the immutable Apptron runtime are released. HashBin publishing and dedicated
-hosting remain in progress; GitHub Pages currently has a stale deployment lock.
+hosting remain in progress. GitHub Pages recovered from its stale deployment lock;
+Apptron’s verified runtime is live at `https://apptron.hashbin.page/`.
 
 | phase | current implementation | remaining acceptance work |
 |---|---|---|
 | 0 | Pure API, stdin/CID inputs, Windows Bash discovery, installers and launchers | Linux, macOS and Windows CI pass, including native CID round trips and Windows installer execution |
-| 1 | Responsive editor, real Python worker, shared modl renderer, Graphviz, review dialog, share/QR, draft recovery, verified offline cache | Chromium and WebKit pass locally; Linux CI now covers Firefox too. Updated Pages deployment is externally blocked |
+| 1 | Responsive editor, real Python worker, shared modl renderer, Graphviz, review dialog, share/QR, draft recovery, verified offline cache | Chromium and WebKit pass locally; Firefox passes all nine original tests in Linux CI. A long-gallery-name phone layout regression was reproduced and fixed |
 | 2 | t256 producers/sinks, canonical CID validation, guard, E14, twin fixtures and spec | Complete |
-| 3 | Verified linux/386 t256, released overlay, exact checked compiler and local CID store in inert txtar handoff | Nine real VM boot tests and four origin-isolation tests pass. All six portable gallery executions pass in the VM. Verify public hosting and enable the pinned runtime when available |
-| 4 | Verified CID loading, typed modl envelopes, CID-based local commands | HashBin Publish registration and save UI; dedicated origin and migration. The current HashBin owned-app tool has been located upstream |
+| 3 | Verified linux/386 t256, released overlay, exact checked compiler and local CID store in inert txtar handoff | Nine real VM boot tests and four origin-isolation tests pass. All six portable gallery executions pass in the VM. Public runtime lock and manifest verify successfully; the editor enables handoff only after that verification |
+| 4 | Verified CID loading, typed modl envelopes, CID local commands, hosted Publish UI, large Apptron snapshot fallback, public-asset hosting and source-only migration | Register the actual public client ID; deploy canonical editor and mirror recovery notice; real paid-save acceptance requires the owner’s signed-in session |
 | 5 | requires/env, missing-tool guards, --portable advice, command inventories and environment badges | All three native CI platforms and the real Apptron VM pass the portable gallery, local saved-envelope execution and tamper rejection |
 
 Verification: `make check` (89 fixtures, 47 unit tests), site build, vendored
-asset verification, 9 Node contract tests and 18 browser tests (9 each in
-Chromium/WebKit). Graphviz and sibling modl parity tools were available locally;
-no optional checks skipped. Firefox fails to start on this Mac before loading
-an application; the Linux browser job verifies it independently. Modl passes
+asset verification, 10 Node contract tests and 26 passing Chromium/WebKit tests cover fixture parity, sharing, offline,
+review, phone controls and mocked HashBin saves including oversized Apptron snapshots. Graphviz and sibling modl parity tools were available locally;
+no optional checks skipped locally. In native CI, macOS/Windows use the documented
+Graphviz brace-check fallback; Windows skips the POSIX executable-stub unit,
+with its native t256 run covered separately. Firefox fails to start on this Mac before loading
+an application; Linux CI verifies it independently. HashBin passes 1,003 unit
+tests and lint with zero errors; real cross-origin draft transfers pass for gripeline
+and the three existing recovery consumers. Modl passes
 33 unit tests, native Chromium zoom/drag/export checks and all 17 shared
 Fragment Kit contracts. Apptron passes 36 unit tests and its build checks.
 
@@ -29,7 +34,7 @@ diagrams.
   <https://modl.hashbin.page/>.
 - You run them from a local filesystem on macOS, Linux, or Windows, given the
   right tools.
-- You run them in the browser under <https://curtcox.github.io/apptron/>.
+- You run them in the browser under <https://apptron.hashbin.page/> (the existing canonical Apptron host).
 - `t256` works in every one of those places and is the tool for writing
   pipelines that move data the same way everywhere.
 

@@ -1,3 +1,4 @@
+import {mountPublishing} from './publishing.js';
 import {checkApptronRuntime} from './apptron-runtime.js';
 import {classifyEnvironments,nativeEnvironments} from './environments.js';
 import {mountWorkspace} from './workspace.js';
@@ -8,12 +9,12 @@ import {localCommand,download,apptronSnapshot,apptronLink} from './run-targets.j
 const $=id=>document.getElementById(id), source=$('source');
 const [inventory,apptronPin]=await Promise.all(['portable-tools.json','apptron-runtime.json'].map(async path=>(await fetch(path)).json()));
 let targets={},compilerSource=null,apptronState={ready:false,reason:'Checking Apptron availability…'};
-let workspace,revision=0,loadRevision=0,timer,result=null,positions=Object.create(null),cid=null;
+let workspace,publishing,revision=0,loadRevision=0,timer,result=null,positions=Object.create(null),cid=null;
 const worker=new Worker(new URL('./transpile.js',import.meta.url),{type:'module'});
 const report=text=>{$('diagnostics').textContent=text;};
 function invalidate() {result=null;revision++;$('run-dialog').close();$('bash').textContent='';for(const id of ['local','apptron','download-bash'])$(id).disabled=true;}
 function check(){invalidate();$('status').textContent='Checking…';worker.postMessage({id:revision,src:source.value,lang:$('language').value,portable:$('portable').checked});}
-function edited(){loadRevision++;cid=null;workspace?.saveDraft();invalidate();$('status').textContent='Waiting for edit…';clearTimeout(timer);timer=setTimeout(check,250);}
+function edited(){publishing?.discardSnapshot();publishing?.cancelLoad();loadRevision++;cid=null;workspace?.saveDraft();invalidate();$('status').textContent='Waiting for edit…';clearTimeout(timer);timer=setTimeout(check,250);}
 source.addEventListener('input',edited);$('language').onchange=edited;$('portable').onchange=edited;
 worker.onerror=event=>{invalidate();$('status').textContent='Runtime unavailable';report(event.message);};
 worker.onmessage=async({data})=>{
@@ -55,14 +56,16 @@ $('close').onclick=()=>$('run-dialog').close();$('copy').onclick=async()=>{try{a
 // Capture the reviewed source and the exact compiler loaded by the worker.
 $('apptron').onclick=async()=>{
   if(!result?.bash||!compilerSource||!apptronState.ready||targets.apptron.status!=='runs')return;
-  const reviewed={src:source.value,lang:result.lang,cids:[...result.cids],compiler:compilerSource};
+  const reviewed={src:source.value,lang:result.lang,cids:[...result.cids],compiler:compilerSource,pos:structuredClone(positions)};
   const popup=window.open('about:blank','_blank');if(!popup){report('Allow a new tab to open Apptron.');return;}popup.opener=null;
-  try{const snapshot=await apptronSnapshot(reviewed.src,reviewed.lang,reviewed.compiler,reviewed.cids);popup.location=await apptronLink(snapshot);}
-  catch(error){popup.close();report(error.message);}
+  let snapshot;
+  try{snapshot=await apptronSnapshot(reviewed.src,reviewed.lang,reviewed.compiler,reviewed.cids);popup.location=await apptronLink(snapshot,apptronPin.baseUrl);}
+  catch(error){popup.close();report(error.message);if(snapshot){publishing.offerSnapshot(snapshot,reviewed);download(snapshot,'pipeline.txtar');report(error.message+' A snapshot was downloaded. On the canonical editor, More → Save Apptron snapshot offers a reviewed HashBin save and an Apptron CID link.');}}
 };
 async function loadHash(){
+  publishing?.cancelLoad();publishing?.discardSnapshot();
   const loading=++loadRevision;
-  if(!location.hash)return;
+  if(!location.hash||new URLSearchParams(location.hash.slice(1)).has('hashbin_publish'))return;
   if(location.hash.length>1500000)throw Error("Diagram link exceeds the size limit");
   const fragment=location.hash.slice(1);
   const state=fragment.startsWith('h1=')?unwrapDiagram(new TextDecoder('utf-8',{fatal:true}).decode(decode64(fragment.slice(3).split('&')[0]))):unwrapDiagram(new TextDecoder('utf-8',{fatal:true}).decode(await loadCID(fragment)));
@@ -79,7 +82,15 @@ try{
   $('gallery').onchange=()=>{const item=gallery[$('gallery').value];if(!item)return;source.value=item.src;$('language').value=item.lang;positions=Object.create(null);edited();};
 }catch{/* Gallery is optional during local source development. */}
 
-workspace=mountWorkspace({getSnapshot:()=>({src:source.value,pos:positions}),onPreview:()=>{if(result)check();},onRestore:async value=>{loadRevision++;cid=null;source.value=value.src;positions=value.pos;$('language').value='';check();},onLoad:async outcome=>{
+workspace=mountWorkspace({getSnapshot:()=>({src:source.value,pos:positions}),onPreview:()=>{if(result)check();},onRestore:async value=>{publishing?.cancelLoad();publishing?.discardSnapshot();loadRevision++;cid=null;source.value=value.src;positions=value.pos;$('language').value='';check();},onLoad:async outcome=>{
   const url=new URL(outcome.kind==='cid'?location.href:outcome.href);if(outcome.kind==='cid')url.hash=outcome.cid;
   location.hash=url.hash;
 }});
+
+publishing=mountPublishing({apptronBase:apptronPin.baseUrl,container:workspace.shell.drawer.body,getSnapshot:()=>({src:source.value,pos:positions}),onLoad:async(value,savedCid)=>{
+  loadRevision++;workspace.shell.drawer.dialog.close();workspace.opened();source.value=value.src;positions=value.pos;cid=savedCid;if(savedCid){const url=new URL(location.href);url.hash=savedCid;url.search='';history.replaceState(null,'',url);}$('language').value='';check();
+},onSaved:async(savedCid,_fingerprint,href)=>{cid=savedCid;history.replaceState(null,'',href);}});
+if(new URLSearchParams(location.hash.slice(1)).has('hashbin_publish')){
+  await publishing.published(location.hash);
+  if(new URLSearchParams(location.hash.slice(1)).has('hashbin_publish'))history.replaceState(null,'',location.pathname);
+}

@@ -62,6 +62,7 @@ test('Apptron is enabled only for the pinned manifest and overlay',async()=>{
   let lock={commit,release:pin.release,manifestSha256},manifest=raw;
   const fetcher=async url=>new Response(url.endsWith('runtime.lock')?JSON.stringify(lock):manifest);
   assert.equal((await checkApptronRuntime(pin,{fetcher})).ready,true);
+  assert.equal((await checkApptronRuntime({...pin,baseUrl:'https://apptron.hashbin.page/'},{fetcher})).ready,true);
   lock={...lock,release:'older-runtime'};assert.equal((await checkApptronRuntime(pin,{fetcher})).ready,false);
   lock={...lock,release:pin.release};manifest=raw+' ';assert.equal((await checkApptronRuntime(pin,{fetcher})).ready,false);
   assert.equal((await checkApptronRuntime({...pin,baseUrl:'https://untrusted.example/'},{fetcher})).ready,false);
@@ -80,4 +81,19 @@ test('CID loading rejects oversized declarations before fetching and bounds resp
 test('current typed modl envelopes retain their fractional positions',()=>{
   const loaded=unwrapDiagram(JSON.stringify({format:'hashbin-diagram',version:1,type:'modl',src:'a square cat',modl:{pos:{a:[1.25,2.5]}}}));
   assert.deepEqual(loaded.pos.a,[1.25,2.5]);
+});
+test('publishing uses inert source and positions with no credential storage',async()=>{
+ const {createDiagramStore,serializeSnapshot,parseSnapshot}=await import('../src/publishing.js');
+ const config={maxBytes:1048576,storagePrefix:'gripeline',hashbinClientId:'test',canonicalOrigin:'https://gripeline.hashbin.page/',recoveryOrigin:'https://curtcox.github.io/gripeline/editor/'};
+ let options,record;
+ const store=createDiagramStore({config,redirectUri:config.canonicalOrigin,loadSDK:async()=>({HashBinClient:class{constructor(value){options=value;}async publish(payload,settings){record={payload,settings};const bytes=new TextEncoder().encode(payload),head=new Uint8Array(6);head[4]=bytes.length>>8;head[5]=bytes.length%256;return{cid:encode64(head)+encode64(new Uint8Array(await crypto.subtle.digest('SHA-512',bytes)))};}}})});
+ await store.init();assert.throws(()=>options.storage.setItem('token','secret'),/credentials/);
+ const snapshot={src:'a square printf hello',pos:{a:[1.25,2.5]},relay:'private',command:'injected'};
+ const payload=serializeSnapshot(snapshot);await store.publish(payload,snapshot);
+ assert.deepEqual(JSON.parse(record.payload),{format:'hashbin-diagram',version:1,src:snapshot.src,pos:snapshot.pos});
+ assert.equal(record.settings.contentType,'application/json');
+ assert.deepEqual(JSON.parse(JSON.stringify(store.documents.parse(payload))),{src:snapshot.src,pos:snapshot.pos});
+ assert.throws(()=>serializeSnapshot({src:'x',pos:{a:[1,Infinity]}}),/position/);
+ const archive='# apptron snapshot v1\n-- file.txt --\ncontent\n';
+ assert.deepEqual(parseSnapshot(serializeSnapshot({kind:'apptron',src:archive,diagram:snapshot})),{kind:'apptron',src:archive});
 });
