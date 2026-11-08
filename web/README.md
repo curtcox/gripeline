@@ -57,4 +57,4 @@ This opens an inert snapshot at Apptron's canonical origin, presses Run explicit
 and verifies the exact embedded compiler and a non-inline CID store produce the
 expected output without enabling VM networking.
 
-Prepared interface update: adopts Fragment Kit 0.3.5 for compact controls, readable buttons and a scrollable More menu with a fixed Close control. The release and deployment are pending; the local compiler and execution isolation are unchanged.
+Interface update: adopts released Fragment Kit 0.3.5 for compact controls, readable buttons and a scrollable More menu with a fixed Close control. Deployment evidence is recorded in the shared Fragment Kit rollout status. The local compiler and execution isolation are unchanged.
