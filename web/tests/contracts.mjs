@@ -91,7 +91,7 @@ test('publishing uses inert source and positions with no credential storage',asy
  const snapshot={src:'a square printf hello',pos:{a:[1.25,2.5]},relay:'private',command:'injected'};
  const payload=serializeSnapshot(snapshot);await store.publish(payload,snapshot);
  assert.deepEqual(JSON.parse(record.payload),{format:'hashbin-diagram',version:1,src:snapshot.src,pos:snapshot.pos});
- assert.equal(record.settings.contentType,'application/json');
+ assert.equal(record.settings.contentType,'application/json');assert.equal(record.settings.mode,'redirect');
  assert.deepEqual(JSON.parse(JSON.stringify(store.documents.parse(payload))),{src:snapshot.src,pos:snapshot.pos});
  assert.throws(()=>serializeSnapshot({src:'x',pos:{a:[1,Infinity]}}),/position/);
  const archive='# apptron snapshot v1\n-- file.txt --\ncontent\n';

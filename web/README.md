@@ -37,7 +37,8 @@ includes only public editor assets and generates the offline hash manifest.
 
 The Apptron runtime has passed the real VM boot check and all six portable
 gallery executions. The editor verifies the deployed runtime lock, manifest
-and overlay before enabling handoff, and embeds the exact checked compiler. HashBin publishing uses the pinned Fragment Kit store and panel, with source-only
+and overlay before enabling handoff, and embeds the exact checked compiler. HashBin publishing uses the pinned Fragment Kit store and panel with in-tab review
+and verified source restoration on return, with source-only
 diagram envelopes and typed Apptron snapshots. The store never persists credentials.
 Only the canonical origin may publish; its public client ID must be registered
 for `https://gripeline.hashbin.page/`. The issued public client is

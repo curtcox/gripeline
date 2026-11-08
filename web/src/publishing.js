@@ -19,7 +19,13 @@ export function parseSnapshot(payload) {
 }
 export function createDiagramStore({config, ...options}) {
   const type={type:'gripeline',fileName:'pipeline.json',contentType:'application/json',normalize:normalizeSnapshot};
-  const store=new HashBinStore({config,type,...options});
+  const loadSDK=options.loadSDK??(()=>import('../vendor/fragment-kit-v0.3.4/vendor/hashbin-sdk-v0.4.0.mjs'));
+  const store=new HashBinStore({config,type,...options,loadSDK:async()=>{
+    const sdk=await loadSDK();
+    return{...sdk,HashBinClient:class extends sdk.HashBinClient{
+      publish(payload,settings){return super.publish(payload,{...settings,mode:'redirect'});}
+    }};
+  }});
   store.documents={...store.documents,normalize:normalizeSnapshot,serialize:serializeSnapshot,parse:parseSnapshot};
   store.load=async input=>unwrapDiagram(new TextDecoder('utf-8',{fatal:true}).decode(await loadCID(store.cid(input))));
   return store;
@@ -34,6 +40,20 @@ export function mountPublishing({container,getSnapshot,onLoad,onSaved,apptronBas
     if(mode==='apptron'){if(value.diagram)await onLoad(normalizeSnapshot(value.diagram),null);}
     else await onLoad(value,savedCid);
   },onSaved:async(cid,fingerprint,href)=>{if(mode!=='apptron')await onSaved(cid,fingerprint,href);},urlState:{link:(base,cid)=>{if(mode==='apptron')return apptronURL(cid);const url=new URL(base);url.hash=cid;url.search='';return url.href;}}});
+  const openSave=panel.openSave.bind(panel);
+  panel.openSave=async()=>{panel.confirm.hidden=false;await openSave();if(!panel.confirm.disabled)panel.message.append(' Review opens on HashBin in this tab, then returns to your diagram.');};
+  const published=panel.published.bind(panel);
+  panel.published=async hash=>{
+    const result=await published(hash);
+    if(result?.cid&&!result.error){
+      panel.status.textContent='Saved to HashBin.';
+      if(panel.snapshot?.kind==='apptron'){
+        const link=document.createElement('a');link.href=apptronURL(result.cid);link.textContent='Open saved Apptron snapshot';
+        panel.message.replaceChildren(link);panel.confirm.hidden=true;panel.ui.open();
+      }
+    }
+    return result;
+  };
   const allowed=location.origin===new URL(canonicalOrigin).origin&&!!config.hashbinClientId;
   if(!allowed){
     panel.saveButton.disabled=true;

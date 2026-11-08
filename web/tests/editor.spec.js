@@ -161,7 +161,8 @@ test.describe('HashBin publishing',()=>{
   await page.route('https://gripeline.hashbin.page/apptron-runtime.json',route=>route.fulfill({json:pin}));
   await page.route('https://apptron.hashbin.page/runtime.lock',route=>route.fulfill({json:{commit,release:pin.release,manifestSha256},headers:{'Access-Control-Allow-Origin':'*'}}));
   await page.route(`https://apptron.hashbin.page/runtime/${commit}/runtime.json`,route=>route.fulfill({body:manifest,contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'}}));
-  const sdk=`export class HashBinClient{constructor(options){this.options=options}async publish(payload,{clientState}){const bytes=new TextEncoder().encode(payload);sessionStorage.setItem('test:published',JSON.stringify({bytes:Array.from(bytes),clientState,redirectUri:this.options.redirectUri}));return{cid:await window.__publishedCID(Array.from(bytes))}}}`;
+  const sdk=`export class HashBinClient{constructor(options){this.options=options}async publish(payload,{clientState,mode}){if(mode!=='redirect')throw Error('Expected in-tab review');const bytes=new TextEncoder().encode(payload),cid=await window.__publishedCID(Array.from(bytes));sessionStorage.setItem('test:published',JSON.stringify({bytes:Array.from(bytes),clientState,cid,mode,redirectUri:this.options.redirectUri}));location.href='https://hashbin.org/publish?return='+encodeURIComponent(this.options.redirectUri+'#hashbin_publish=test');return{redirected:true}}async handlePublishCallback(){return JSON.parse(sessionStorage.getItem('test:published'))}}`;
+  await page.route('https://hashbin.org/publish?**',route=>route.fulfill({body:'<script>location.replace(new URL(location.href).searchParams.get("return"))</script>',contentType:'text/html'}));
   await page.route('**/vendor/hashbin-sdk-v0.4.0.mjs',route=>route.fulfill({body:sdk,contentType:'text/javascript'}));
   await page.exposeFunction('__publishedCID',array=>{const bytes=Buffer.from(array),head=Buffer.alloc(6);head.writeUIntBE(bytes.length,0,6);return head.toString('base64url')+(bytes.length<=64?bytes:createHash('sha512').update(bytes).digest()).toString('base64url');});
   await page.goto('https://gripeline.hashbin.page/');await expect(page.locator('#status')).toContainText('Checked');
@@ -170,8 +171,7 @@ test.describe('HashBin publishing',()=>{
   await expect(page.locator('#hashbin-message')).toContainText('exact price');await expect(page.locator('#hashbin-confirm')).toBeEnabled();await page.locator('#hashbin-confirm').click();
   await expect(page.locator('#hashbin-status')).toHaveText('Saved to HashBin.');
   const recorded=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('test:published')));
-  expect(recorded.redirectUri).toBe('https://gripeline.hashbin.page/');expect(JSON.parse(Buffer.from(recorded.bytes).toString()).src).toBe('a square printf published');
-  await page.locator('#hashbin-dialog .fk-close').click();await page.locator('#fk-more-drawer .fk-close').click();
+  expect(recorded.mode).toBe('redirect');expect(recorded.redirectUri).toBe('https://gripeline.hashbin.page/');expect(JSON.parse(Buffer.from(recorded.bytes).toString()).src).toBe('a square printf published');
   await page.getByRole('button',{name:'Run locally',exact:true}).click();await expect(page.locator('#command')).toHaveValue(/^gripeline run "t256:/);
   expect(await page.evaluate(()=>Object.keys(localStorage).some(key=>/token|credential/i.test(key)))).toBe(false);
   await page.locator('#close').click();

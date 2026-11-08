@@ -306,5 +306,6 @@ Phases 0 and the modl renderer extraction can proceed in parallel. Phases 2 and
   `app_dc8bf51a-ebee-4ef0-879e-1cccbfc1a01b`; its sole return URL is
   `https://gripeline.hashbin.page/`. The editor meta tag and HashBin owned-app
   registry record the same ID. The UI and CID-verification round trip pass with
-  the SDK test stand-in. Real paid-save acceptance still requires approval of
+  the SDK test stand-in, including in-tab review and source restoration after
+  returning from HashBin. Real paid-save acceptance still requires approval of
   the concrete quote on HashBin and is not yet claimed as complete.
