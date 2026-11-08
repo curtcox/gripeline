@@ -207,3 +207,19 @@ test.describe('stale CID loads',()=>{
   await page.waitForTimeout(300);await expect(page.locator('#source')).toHaveValue('a square printf linked');
  });
 });
+
+for(const width of [1440,390])test(`workspace views and More stay usable at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:640});await page.goto('/editor/');
+  await expect(page.locator('#status')).toContainText('Checked');
+  for(const name of ['Source','Diagram','Split']){
+    await page.getByRole('tab',{name,exact:true}).click();
+    await expect(page.getByRole('tab',{name,exact:true})).toHaveAttribute('aria-selected','true');
+    await expect(page.locator('.fk-view-panel:visible')).toHaveCount(name==='Split'?4:1);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  await page.getByRole('button',{name:'More',exact:true}).click();
+  await page.locator('#fk-more-drawer .fk-dialog-body').evaluate(el=>el.scrollTop=el.scrollHeight);
+  const close=page.locator('#fk-more-drawer .fk-close'),bounds=await close.boundingBox();
+  expect(bounds.y).toBeGreaterThanOrEqual(0);expect(bounds.y+bounds.height).toBeLessThanOrEqual(640);
+  await close.click();await expect(page.locator('#fk-more-drawer')).not.toBeVisible();
+});

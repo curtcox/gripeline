@@ -3,3 +3,6 @@
 .fk-header .fk-nav{border:0;padding:0;gap:12px}.fk-header{padding:16px 4vw}.fk-toolbar{padding:10px 4vw;border-bottom:1px solid var(--line)}.fk-status{padding:12px 4vw}.fk-dialog h2{display:block}.fk-dialog textarea{width:100%}.fk-tabs{padding:0}.fk-tabs button{min-width:0;padding:8px}.fk-dialog pre{min-height:0}#diagram:has(svg[aria-label="MODL diagram"]){background:#12161c}@media(max-width:767px){.fk-toolbar{flex-wrap:wrap}.fk-tabs{width:100%;gap:5px}.fk-tabs button{font-size:12px}#status{font-size:11px}.panels{grid-template-columns:1fr}}
 /* Example titles may be longer than a phone's available action row. */
 nav label{min-width:0;max-width:100%}nav select{min-width:0;max-width:100%;flex-shrink:1}.fk-drawer input{max-width:100%}#hashbin-status{display:block;overflow-wrap:anywhere}
+
+:root{--fk-text:var(--ink);--fk-muted:var(--muted);--fk-panel:#fff;--fk-surface:var(--paper);--fk-border:var(--line);--fk-accent:#2f6619}.fk-compact #status{margin-left:0}
+@media(prefers-color-scheme:dark){:root{--fk-text:#e1eee7;--fk-panel:#1d2d27;--fk-surface:#15211e;--fk-muted:#a9bfb3;--fk-border:#526b5d;--fk-accent:#8bd8bf}.fk-header.fk-compact{background:var(--fk-panel);color:var(--fk-text)}}

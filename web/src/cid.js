@@ -1,4 +1,4 @@
-import {readResponse} from '../vendor/fragment-kit-v0.3.4/src/core/bytes.js';
+import {readResponse} from '../vendor/fragment-kit-v0.3.5/src/core/bytes.js';
 export const encode64 = bytes => { let s=''; for(const b of bytes)s+=String.fromCharCode(b); return btoa(s).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,''); };
 export const decode64 = text => Uint8Array.from(atob(text.replaceAll('-','+').replaceAll('_','/')+'='.repeat((4-text.length%4)%4)), c=>c.charCodeAt(0));
 export function parseCID(reference) {
