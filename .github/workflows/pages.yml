@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      published_cid:
+        description: Published portable-count diagram CID (optional manual acceptance)
+        required: false
+        type: string
+        default: ''
 
 # Allow the GITHUB_TOKEN to deploy to Pages.
 permissions:
@@ -92,6 +98,8 @@ jobs:
         run: MODL_REPO="${GITHUB_WORKSPACE}/.modl-repo" python3 tests/test_units.py
 
       - name: Test portable gallery with the pinned native t256
+        env:
+          GRIPELINE_PUBLISHED_CID: ${{ inputs.published_cid || '' }}
         run: python3 scripts/check_portability.py
 
       - name: Test Windows installers and launchers

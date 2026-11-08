@@ -152,7 +152,7 @@ test.describe('HashBin publishing',()=>{
   // Serve our built editor at its production address while keeping all checks local.
   await page.route('https://gripeline.hashbin.page/**',async route=>{
    const url=new URL(route.request().url()),file=path.join(root,'site/_site/editor',url.pathname==='/'?'index.html':url.pathname.slice(1));
-   let body=readFileSync(file);if(url.pathname==='/')body=Buffer.from(body.toString().replace('name="hashbin-client-id" content=""','name="hashbin-client-id" content="test-client"'));
+   let body=readFileSync(file);if(url.pathname==='/')body=Buffer.from(body.toString().replace(/name="hashbin-client-id" content="[^"]*"/,'name="hashbin-client-id" content="test-client"'));
    const type=file.endsWith('.wasm')?'application/wasm':/\.(mjs|js)$/.test(file)?'text/javascript':file.endsWith('.html')?'text/html':file.endsWith('.json')?'application/json':file.endsWith('.css')?'text/css':'application/octet-stream';
    await route.fulfill({body,contentType:type});
   });

@@ -140,3 +140,11 @@ t256 into a temporary directory, verifies the environment's baseline commands,
 executes both languages of every portable twin, and checks a saved CID envelope
 and tampered-content rejection. `--release-dir PATH` uses a local release cache.
 CI runs it on macOS, Linux and Windows.
+
+
+For one-time acceptance after approving a real HashBin save of
+`portable_t256_count.case`, dispatch the Pages workflow with `published_cid`.
+The OS matrix downloads with its pinned native t256, verifies the diagram source
+matches that fixture exactly, then runs the CID command and expects `6`.
+Unrelated programs are rejected before execution; ordinary CI has no expiring
+public-CID dependency.

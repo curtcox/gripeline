@@ -117,8 +117,8 @@ enabling a handoff. The snapshot includes the exact compiler that checked the so
 opening it performs a static check and offers a command to run explicitly.
 The canonical editor is live at [gripeline.hashbin.page](https://gripeline.hashbin.page/).
 HashBin save controls use hosted per-save review and verify the returned CID.
-Saving stays disabled until its public client registration is complete; the shared
-Pages mirror always disables publishing. Oversized Apptron links can be downloaded
+Publishing is enabled on the registered canonical origin; the shared Pages mirror
+always disables publishing. Oversized Apptron links can be downloaded
 as snapshots or saved for an Apptron CID handoff. See [EDITOR_PLAN.md](EDITOR_PLAN.md) for current phase status.
 
 The editor's environment badges combine declared requirements with first command

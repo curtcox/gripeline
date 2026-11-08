@@ -40,7 +40,8 @@ gallery executions. The editor verifies the deployed runtime lock, manifest
 and overlay before enabling handoff, and embeds the exact checked compiler. HashBin publishing uses the pinned Fragment Kit store and panel, with source-only
 diagram envelopes and typed Apptron snapshots. The store never persists credentials.
 Only the canonical origin may publish; its public client ID must be registered
-for `https://gripeline.hashbin.page/`. Missing registration keeps Save disabled.
+for `https://gripeline.hashbin.page/`. The issued public client is
+`app_dc8bf51a-ebee-4ef0-879e-1cccbfc1a01b`. A missing registration keeps Save disabled.
 The shared recovery adapter accepts only source, finite positions and draft history.
 It retains the old copy and rejects credential or execution settings. See `../EDITOR_PLAN.md` for status.
 

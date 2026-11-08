@@ -12,10 +12,10 @@ Apptron’s verified runtime is live at `https://apptron.hashbin.page/`.
 | 1 | Responsive editor, real Python worker, shared modl renderer, Graphviz, review dialog, share/QR, draft recovery, verified offline cache | Chromium and WebKit pass locally; Firefox passes all nine original tests in Linux CI. A long-gallery-name phone layout regression was reproduced and fixed |
 | 2 | t256 producers/sinks, canonical CID validation, guard, E14, twin fixtures and spec | Complete |
 | 3 | Verified linux/386 t256, released overlay, exact checked compiler and local CID store in inert txtar handoff | Nine real VM boot tests and four origin-isolation tests pass. All six portable gallery executions pass in the VM. Public runtime lock and manifest verify successfully. Live public VM acceptance passes with the exact current compiler and an embedded non-inline CID store; opening the handoff remains inert |
-| 4 | Verified CID loading, typed modl envelopes, CID local commands, hosted Publish UI, large Apptron snapshot fallback, public-asset hosting and source-only migration | Canonical editor deployed and verified in Chromium/WebKit, including offline reload. Mirror recovery notice is implemented. Register the actual public client ID and perform real paid-save acceptance with the owner’s signed-in session |
+| 4 | Verified CID loading, typed modl envelopes, CID local commands, hosted Publish UI, large Apptron snapshot fallback, public-asset hosting and source-only migration | Canonical editor deployed and verified in Chromium/WebKit, including offline reload. Mirror recovery notice is implemented. Client registered with the sole canonical callback; perform real paid-save acceptance with the owner’s signed-in session |
 | 5 | requires/env, missing-tool guards, --portable advice, command inventories and environment badges | All three native CI platforms and the real Apptron VM pass the portable gallery, local saved-envelope execution and tamper rejection |
 
-Verification: `make check` (89 fixtures, 47 unit tests), site build, vendored
+Verification: `make check` (89 fixtures, 49 unit tests), site build, vendored
 asset verification, 10 Node contract tests and 26 passing Chromium/WebKit tests cover fixture parity, sharing, offline,
 review, phone controls and mocked HashBin saves including oversized Apptron snapshots. Graphviz and sibling modl parity tools were available locally;
 no optional checks skipped locally. In native CI, macOS/Windows use the documented
@@ -302,10 +302,9 @@ Phases 0 and the modl renderer extraction can proceed in parallel. Phases 2 and
   installation inside WSL; a Windows Python process rejects the WSL launcher.
 - Pyodide is pinned and self-hosted. Its initial runtime download is shown in the
   editor's loading status; Graphviz loads only for dot input.
-- HashBin registration requires the owner's signed-in browser. No client ID was
-  invented: the registry intentionally records `null`, and saving stays disabled.
-  Register **gripeline** with the sole return URL `https://gripeline.hashbin.page/`,
-  record the real public ID in the editor meta tag and the HashBin owned-app
-  registry, redeploy, then approve a concrete save quote for paid acceptance.
-  The UI and CID-verification round trip already pass with the SDK test stand-in;
-  real paid saves are not claimed as complete.
+- HashBin registration is complete. The issued public client ID is
+  `app_dc8bf51a-ebee-4ef0-879e-1cccbfc1a01b`; its sole return URL is
+  `https://gripeline.hashbin.page/`. The editor meta tag and HashBin owned-app
+  registry record the same ID. The UI and CID-verification round trip pass with
+  the SDK test stand-in. Real paid-save acceptance still requires approval of
+  the concrete quote on HashBin and is not yet claimed as complete.

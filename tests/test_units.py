@@ -470,6 +470,19 @@ class EditorPrerequisites(unittest.TestCase):
             with self.assertRaisesRegex(gl.GripError, 'WSL'):
                 gl.locate_bash()
 
+    def test_published_acceptance_admits_only_the_reviewed_fixture(self):
+        from scripts.check_portability import published_fixture
+        fixture = published_fixture(json.dumps({'format': 'hashbin-diagram', 'version': 1,
+            'src': (ROOT / 'cases/portable_t256_count.case').read_text().split('=== modl ===\n')[1].split('=== bash ===')[0]}))
+        self.assertEqual(fixture.name, 'portable-t256-count')
+
+    def test_published_acceptance_rejects_other_programs(self):
+        from scripts.check_portability import published_fixture
+        for payload in ({'format': 'hashbin-diagram', 'version': 1, 'src': 'a square echo unchecked'},
+                        {'src': 'a square echo unchecked'}, []):
+            with self.assertRaises(RuntimeError):
+                published_fixture(json.dumps(payload))
+
     def test_cid_run_with_stub_t256(self):
         if os.name == 'nt':
             self.skipTest('POSIX executable stub; Windows CID resolution is covered by the mocked test')

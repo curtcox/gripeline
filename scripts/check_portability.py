@@ -5,6 +5,7 @@ Runs in the CI OS matrix; deliberately separate from network-free make check.
 Use --release-dir for an already downloaded, checksum-verified release cache.
 """
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -22,9 +23,22 @@ import gripeline as gl
 import run as harness
 
 
+def published_fixture(payload):
+    """Admit only the reviewed count fixture for manual public-save acceptance."""
+    document = json.loads(payload)
+    if not isinstance(document, dict) or document.get('format') != 'hashbin-diagram' or document.get('version') != 1:
+        raise RuntimeError('Published acceptance input must be a diagram envelope')
+    case = harness.parse_case(ROOT / 'tests/cases/portable_t256_count.case')
+    source = document.get('src')
+    if not isinstance(source, str) or source.strip() not in (case.dot.strip(), case.modl.strip()):
+        raise RuntimeError('Published acceptance input must match the portable count fixture exactly')
+    return case
+
+
 def main():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--release-dir', type=Path)
+    parser.add_argument('--published-cid', default=os.environ.get('GRIPELINE_PUBLISHED_CID', ''))
     args = parser.parse_args()
     environment = {'Darwin': 'macos', 'Linux': 'linux', 'Windows': 'windows'}[platform.system()]
     system = {'macos': 'darwin', 'linux': 'linux', 'windows': 'windows'}[environment]
@@ -94,6 +108,19 @@ def main():
         if result.returncode != 2 or result.stdout:
             raise RuntimeError('Tampered CID input was not rejected before execution')
         print(f'{environment}: baseline tools, {count} portable twin executions, CID envelope round trip and tamper rejection passed')
+        if args.published_cid:
+            cid = gl.cid_reference(args.published_cid)
+            if int.from_bytes(base64.urlsafe_b64decode(cid[:8]), 'big') > 1048576:
+                raise RuntimeError('Published acceptance input exceeds 1 MiB')
+            config.write_text(json.dumps({'providers': {'public': {'type': 'http', 'url': 'https://256t.us'}}, 'sources': ['public'], 'timeout': '30s'}), encoding='utf-8')
+            loaded = command([str(executable), 'load', cid])
+            if loaded.returncode:
+                raise RuntimeError(loaded.stderr)
+            case = published_fixture(loaded.stdout)
+            result = command([sys.executable, str(ROOT / 'gripeline.py'), 'run', 't256:' + cid])
+            if result.returncode or result.stdout.strip() != case.sections['stdout'].strip():
+                raise RuntimeError(f'Published CID run failed: {result.stdout!r}, {result.stderr}')
+            print(f'{environment}: approved public CID save → copy → run passed (output 6)')
 
 
 if __name__ == '__main__':
