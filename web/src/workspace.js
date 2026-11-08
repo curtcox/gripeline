@@ -1,4 +1,4 @@
-import {createConfig,createShell,mountMobileTabs,createShareDialog,createQrDialog,OfflineClient,LocalDrafts,createStorage} from '../vendor/fragment-kit-v0.3.4/src/index.js';
+import {createConfig,createShell,mountMobileTabs,createShareDialog,createQrDialog,OfflineClient,LocalDrafts,createStorage} from '../vendor/fragment-kit-v0.3.5/src/index.js';
 import {shareLink,decode64,unwrapDiagram,parseCID} from './cid.js';
 export function mountWorkspace({getSnapshot,onLoad,onPreview,onRestore}) {
   const current=new URL(location.href);current.hash='';current.search='';current.pathname=current.pathname.replace(/index\.html$/,'');
@@ -21,7 +21,7 @@ export function mountWorkspace({getSnapshot,onLoad,onPreview,onRestore}) {
   const qr=createQrDialog({config,urlState,onLoad});
   const button=document.createElement('button');button.id='qr';button.textContent='QR code';button.onclick=()=>qr.open(urlState.build(getSnapshot()).href);shell.toolbar.append(button);
   const panels=[...document.querySelectorAll('.panels>section')].map((panel,index)=>({label:['Source','Diagram','Bash','Diagnostics'][index],panel}));
-  const tabs=mountMobileTabs({container:shell.toolbar,panels,onChange:index=>{if(index===1)onPreview();}});
+  const tabs=mountMobileTabs({desktop:true,container:shell.toolbar,panels,onChange:index=>{if(index===1)onPreview();}});
   const update=document.createElement('button');update.textContent='Update offline copy';update.hidden=true;shell.drawer.body.append(update);
   const offline=new OfflineClient({onStatus:status=>{shell.offlineStatus.textContent=status.ready?'Editor available offline':'Offline copy incomplete';},onUpdate:()=>{update.hidden=false;}});
   const repair=document.createElement('button');repair.textContent='Repair offline copy';repair.onclick=()=>offline.repair().catch(error=>{shell.offlineStatus.textContent=error.message;});shell.drawer.body.append(repair);

@@ -31,7 +31,7 @@ Bash must be reviewed in the local-run dialog before copying its command.
 
 `src/modl-render.js` embeds modl's standalone `renderDiagram` from pinned,
 byte-identical vendor files. Host callbacks provide dragging, panning and zoom;
-links use safe HTTP(S) navigation. The Fragment Kit shell supplies mobile tabs,
+links use safe HTTP(S) navigation. The Fragment Kit shell supplies full-pane and split views,
 sharing, QR, draft recovery and verified offline caching. The site builder
 includes only public editor assets and generates the offline hash manifest.
 
@@ -56,3 +56,5 @@ node tests/live-apptron.mjs
 This opens an inert snapshot at Apptron's canonical origin, presses Run explicitly,
 and verifies the exact embedded compiler and a non-inline CID store produce the
 expected output without enabling VM networking.
+
+Prepared interface update: adopts Fragment Kit 0.3.5 for compact controls, readable buttons and a scrollable More menu with a fixed Close control. The release and deployment are pending; the local compiler and execution isolation are unchanged.
