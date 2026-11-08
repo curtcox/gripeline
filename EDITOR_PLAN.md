@@ -1,31 +1,36 @@
 # Editor and run-anywhere plan
 
-Status: **implementation in progress** (2026-11-07). Compiler, editor, native
-installers and the Apptron overlay are committed and pushed. t256 v0.1.0 and
-the immutable Apptron runtime are released. HashBin publishing and dedicated
-hosting remain in progress. GitHub Pages recovered from its stale deployment lock;
-Apptron’s verified runtime is live at `https://apptron.hashbin.page/`.
+Status: **implemented and deployed** (2026-11-07). All six phases meet their
+acceptance criteria. Changes are committed across gripeline, modl, 256t.org,
+apptron and hashbin.org. The canonical editor is
+[gripeline.hashbin.page](https://gripeline.hashbin.page/); Pages retains the
+spec, conformance results and a recovery mirror.
 
-| phase | current implementation | remaining acceptance work |
-|---|---|---|
-| 0 | Pure API, stdin/CID inputs, Windows Bash discovery, installers and launchers | Linux, macOS and Windows CI pass, including native CID round trips and Windows installer execution |
-| 1 | Responsive editor, real Python worker, shared modl renderer, Graphviz, review dialog, share/QR, draft recovery, verified offline cache | Chromium and WebKit pass locally; Firefox passes all nine original tests in Linux CI. A long-gallery-name phone layout regression was reproduced and fixed |
-| 2 | t256 producers/sinks, canonical CID validation, guard, E14, twin fixtures and spec | Complete |
-| 3 | Verified linux/386 t256, released overlay, exact checked compiler and local CID store in inert txtar handoff | Nine real VM boot tests and four origin-isolation tests pass. All six portable gallery executions pass in the VM. Public runtime lock and manifest verify successfully. Live public VM acceptance passes with the exact current compiler and an embedded non-inline CID store; opening the handoff remains inert |
-| 4 | Verified CID loading, typed modl envelopes, CID local commands, hosted Publish UI, large Apptron snapshot fallback, public-asset hosting and source-only migration | Canonical editor deployed and verified in Chromium/WebKit, including offline reload. Mirror recovery notice is implemented. Client registered with the sole canonical callback; perform real paid-save acceptance with the owner’s signed-in session |
-| 5 | requires/env, missing-tool guards, --portable advice, command inventories and environment badges | All three native CI platforms and the real Apptron VM pass the portable gallery, local saved-envelope execution and tamper rejection |
+| phase | implementation and acceptance |
+|---|---|
+| 0 | Shared pure Python API, stdin/CID input, envelope unwrapping, Windows Bash discovery, installers and launchers. Native Linux/macOS/Windows CI passes, including installer execution and verified CID round trips. |
+| 1 | Responsive editor, real Python worker, shared MODL renderer, Graphviz, review dialog, share/QR, explicit unverified draft recovery and verified offline cache. All 39 Chromium/Firefox/WebKit checks pass in Linux CI. Canonical HTTPS, rendering, phone layout and offline reload pass live Chromium/WebKit checks. |
+| 2 | t256 source/sink nodes, canonical CID validation, E14, guard, normative spec and twin fixtures. |
+| 3 | Checksummed t256 v0.1.0 linux/386 release, immutable Apptron overlay and inert handoff containing the exact checked compiler and verified local CID store. Nine real boot tests and four isolation checks pass; all six portable twins pass in the VM. Live public VM execution with a non-inline embedded CID produces `HANDOFF_OK=70` without VM networking. |
+| 4 | Registered canonical Publish client, in-tab review with verified source restoration, CID loads/commands, large Apptron snapshot fallback and source-only mirror recovery. The approved real $0.01 one-month save returned its expected CID; Linux/macOS/Windows CI each downloaded and ran that saved diagram with output `6`. Old work and fractional positions survive live recovery; credentials are excluded. |
+| 5 | requires/env declarations, missing-tool guards, --portable advice, command inventories and environment badges. All three native platforms and the real VM pass the portable gallery, saved-envelope execution and tamper rejection. |
 
-Verification: `make check` (89 fixtures, 49 unit tests), site build, vendored
-asset verification, 10 Node contract tests and 26 passing Chromium/WebKit tests cover fixture parity, sharing, offline,
-review, phone controls and mocked HashBin saves including oversized Apptron snapshots. Graphviz and sibling modl parity tools were available locally;
-no optional checks skipped locally. In native CI, macOS/Windows use the documented
-Graphviz brace-check fallback; Windows skips the POSIX executable-stub unit,
-with its native t256 run covered separately. Firefox fails to start on this Mac before loading
-an application; Linux CI verifies it independently. HashBin passes 1,003 unit
-tests and lint with zero errors; real cross-origin draft transfers pass for gripeline
-and the three existing recovery consumers. Modl passes
-33 unit tests, native Chromium zoom/drag/export checks and all 17 shared
-Fragment Kit contracts. Apptron passes 36 unit tests and its build checks.
+Verification: `make check` (89 fixtures, 49 unit tests), site build, 55 pinned
+vendor files, 10 Node contracts, 26 local Chromium/WebKit tests and 39 Linux
+browser checks. Graphviz and sibling MODL parity tools run locally. macOS/Windows
+CI use the documented Graphviz brace fallback; Windows skips the POSIX-stub
+unit, with native CID execution tested separately. Firefox cannot start on this
+Mac before loading an app; Linux CI covers it. MODL passes 33 units, native
+render/drag/export checks and 17 Fragment Kit contracts. Apptron passes 36
+units and its runtime checks. HashBin passes 1,003 units and lint with zero errors.
+
+The real save → copy → run acceptance is recorded in
+[CI run 42431697655](https://github.com/curtcox/gripeline/actions/runs/42431697655).
+The [saved diagram](https://gripeline.hashbin.page/#AAAAAADbIr5jTeatdHPRHwpq44oHm1DGKsB1ndJWSCXizbMhBI2FA54vnTfrX9xFv6MtS6Fd4XnB1-grQ8cEP1leBgSlEw)
+was approved for one month of retention. Normal CI uses local stores and never
+depends on this expiring public CID; manual `published_cid` acceptance validates
+that downloaded source is exactly the reviewed portable count fixture before
+execution.
 
 Goal: the gripeline site lets you **construct, view, and run** gripeline
 diagrams.
@@ -291,7 +296,7 @@ python3 gripeline.py check pipeline.modl && echo "Try: python3 gripeline.py run 
 Phases 0 and the modl renderer extraction can proceed in parallel. Phases 2 and
 3 depend on 0. Phase 4 depends on 1.
 
-## 9. Implementation decisions and remaining account work
+## 9. Implementation decisions and registration
 
 - The current HashBin owned-app tool deploys `gripeline.hashbin.page`; its
   existence was hidden by the old local checkout. The canonical editor is live.
@@ -307,5 +312,6 @@ Phases 0 and the modl renderer extraction can proceed in parallel. Phases 2 and
   `https://gripeline.hashbin.page/`. The editor meta tag and HashBin owned-app
   registry record the same ID. The UI and CID-verification round trip pass with
   the SDK test stand-in, including in-tab review and source restoration after
-  returning from HashBin. Real paid-save acceptance still requires approval of
-  the concrete quote on HashBin and is not yet claimed as complete.
+  returning from HashBin. The real quoted $0.01 save was approved, returned the
+  expected verified CID and passed native save → copy → run acceptance on all
+  three OSes. No persistent HashBin allowance was created.
