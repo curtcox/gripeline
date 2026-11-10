@@ -1,11 +1,38 @@
-# Plan: modl as a second gripeline source language
+# Completed: modl as a second gripeline source language
 
 **Status:** implemented (Phases 0–3). **Date:** 2026-11-07.
 
-> **Superseded in part:** decision 1's "modl's grammar does not change" no
-> longer holds. modl's grammar may now change; upward compatibility is a
-> preference, not a hard constraint. Follow-up fixes and planned modl
-> enhancements are in [MODL_REVIEW_PLAN.md](MODL_REVIEW_PLAN.md).
+Reviewed 2026-11-10. This is the completed implementation/design record, not
+an active plan. [Outstanding work](../todo/README.md) is tracked separately.
+The [modl review](MODL_REVIEW_PLAN.md) records the later completed fixes and
+native syntax extensions.
+
+Current decisions superseding the original brief below:
+
+- The grammar may change; SPEC §14.4 documents compatibility costs. Native
+  bracket ports, brace groups, additional shapes and `double` stderr edges
+  shipped after this initial front end.
+- `hex` remains a file alias alongside `note`/`cylinder`. Native group titles
+  beginning with `for`, `while` or `until` supply loop headers. Legacy pragma
+  blocks remain aliases; non-loop group text is display-only.
+- `#gl` is case-sensitive. Whole-line settings target the graph even inside
+  a block; trailing opener pragmas set block attributes.
+- Parity imports modl's standalone `js/parse.js`, replacing the proposed
+  parser-export script. The [local parity prerequisite](../todo/MODL_PARITY.md)
+  remains outstanding for this workspace's old sibling checkout.
+- CID inputs now use verified native `t256 load`; they are no longer refused.
+  The gripeline browser editor provides Bash preview using the real Python
+  compiler. A separate [modl-side preview](../todo/MODL_EDITOR.md) stays deferred.
+- Pragma syntax highlighting shipped as review B10. The modl-side
+  `docs-src/gripeline.html` and `docs-src/pipeline-features.html` were recorded
+  as delivered with the companion changes.
+
+[`../SPEC.md`](../SPEC.md) describes current behavior. The following original
+brief preserves the rationale and implementation sequence as historical
+context; its old vocabulary counts, parser location and limitations describe
+the starting point.
+
+## Original brief (completed)
 
 Goal: `gripeline build|run|check foo.modl` works the way it does for `foo.dot`.
 The same `.modl` file still opens and renders unchanged in the
@@ -17,7 +44,8 @@ Decided (from the Q&A; detailed decisions D1–D5 are in §2):
 
 1. gripeline-only meaning goes in **`#gl` comment pragmas**. modl's lexer drops
    comments, so pragmas are invisible to the modl renderer, the same way
-   Graphviz ignores `gl_*` attributes. **modl's grammar does not change.**
+   Graphviz ignores `gl_*` attributes. The original **"modl's grammar does not
+   change"** constraint was superseded by the completed native extensions.
 2. A small set of **modl shapes and line styles carries roles by default**
    (like dot's `shape=note`/`box`). Color, size, URL and background never do.
 3. Delivery is **phased**: core features first, grouping (subshells,
@@ -58,8 +86,8 @@ modl facts that matter for execution:
 
 ## 2. Design decisions (decided)
 
-All five decisions below are **decided** (2026-11-07) and are binding for the
-implementation.
+These five decisions guided the initial implementation (2026-11-07). Read
+them with the superseding decisions above and the current SPEC.
 
 **D1 (decided). Operation text is the raw source slice, not modl's de-quoted value.**
 gripeline takes a node's (or edge's) text as the exact source characters from the
@@ -298,26 +326,21 @@ ver -> each dashed                       # ordering: ver before loop
 
 ---
 
-## 7. modl repo changes (all optional; none touch the hash-locked engine)
+## 7. Outcomes of the optional modl proposals
 
-You had no preference here. These are my recommendations, cheapest first:
+20. **Parser parity adapter:** the proposed `scripts/export-parse.mjs` engine
+    slicer was superseded by standalone `js/parse.js` (review B1).
+    `tests/modl_parse.cjs` imports it directly for items 15 and 18.
+21. **Docs page:** `docs-src/gripeline.html` was recorded as delivered with
+    the companion modl changes, covering the reserved shapes/styles, pragmas
+    and pipeline examples. The later native extensions are documented in
+    `docs-src/pipeline-features.html`.
+22. The deferred modl-side "Show bash" proposal has moved to
+    [todo/MODL_EDITOR.md](../todo/MODL_EDITOR.md). It was not part of the
+    completed implementation.
 
-20. **Parser export script** `scripts/export-parse.mjs` (dev-only, kept off the
-    `public-assets.mjs` allowlist): it slices the engine block exactly as
-    `check.mjs` does, evaluates it in `node:vm`, and prints `parseSource(src)` as
-    JSON for each file given. This powers items 15 and 18. **Recommended**: it's
-    small and gives real parity checking.
-21. **Docs page** `docs-src/gripeline.html`: "Running a diagram as a pipeline",
-    covering the reserved shapes and line styles, `#gl` pragmas, and a few
-    Open-in-editor examples. Regenerate `docs/` with `npm run docs` and pass
-    `npm test` and `npm run check`. **Recommended** once phase 1 has shipped.
-22. **Not now:** a "Show bash" panel in the editor. It needs a JS port of the
-    transpiler or a hosted service, and keeping two implementations in sync costs
-    more than it's worth until the language settles.
-
-Optional, cosmetic, and only if you want it later: syntax highlighting for `#gl`
-pragmas in the editor. Highlighting lives outside the hash-locked parser block,
-but it is UI code and needs the browser tests.
+The originally optional `#gl` syntax highlighting was delivered by
+[review B10](MODL_REVIEW_PLAN.md).
 
 ---
 
@@ -329,19 +352,19 @@ but it is UI code and needs the browser tests.
 | 2    | modl parser + pragmas + translation + CLI  | M          |
 | 3    | E10–E12, annotate, twins + modl-only cases | M          |
 | 4    | SPEC §14, README, site                     | S–M        |
-| 5    | modl `export-parse.mjs` + cross-check in CI | S         |
+| 5    | modl parser adapter + cross-check in CI (later standalone parser) | S |
 | 6    | Phase 2 grouping + its twins               | M          |
 | 7    | modl docs page; share-link input; lints    | S each     |
 
 Each step leaves `python3 tests/run.py` green, and the existing dot output stays
 byte-identical throughout. That's the regression guard for the refactor.
 
-## 9. Still open (can be settled during implementation)
+## 9. Resolved questions
 
-- Is `hex` the right "file" shape? modl has nothing note-like. `triangle` is the
-  other candidate.
-- Should a group's stand-in node supply the loop header from its own text
-  (`each diamond for svc in api web worker` plus `#gl begin each loop`), so the
-  header is visible in the picture? It's nice, but it's a second way to say the
-  same thing.
-- Should `#gl` be case-sensitive like the rest of modl? (Proposed: yes.)
+- `hex` remains a file alias; `note` and `cylinder` provide additional file shapes.
+- Native group titles supply loop headers when they begin with a loop keyword;
+  legacy stand-in text on non-loop groups is display-only.
+- `#gl` is case-sensitive, matching the rest of modl.
+
+No implementation question from this section remains open. Deferred work and
+verification prerequisites live only in [`../todo/`](../todo/README.md).

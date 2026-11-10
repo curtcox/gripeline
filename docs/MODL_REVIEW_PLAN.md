@@ -1,9 +1,18 @@
-# Plan: modl front-end fixes and modl enhancements
+# Completed: modl front-end fixes and enhancements
 
-**Status:** implemented in gripeline and the sibling `../modl` working tree. **Date:** 2026-11-07.
+**Status:** A1–A8 and B1–B10 recorded as implemented on 2026-11-07 in
+gripeline and the companion modl working tree.
+
+Reviewed 2026-11-10. This is a completion record. The current workspace's
+sibling checkout lacks the standalone parser; restoring local parity
+verification is tracked in [todo/MODL_PARITY.md](../todo/MODL_PARITY.md).
+The original findings and proposed remedies below are retained as historical
+context. The final decisions in the last section describe what shipped.
+Removing the advertised no-op flags completed A8; implementing those optional
+modes remains [deferred](../todo/CLI_MODES.md).
 
 This plan comes from a review of the modl front end in
-[`gripeline.py`](gripeline.py) (written after [MODL_PLAN.md](MODL_PLAN.md)
+[`gripeline.py`](../gripeline.py) (written after [MODL_PLAN.md](MODL_PLAN.md)
 Phases 0–3 shipped). It has two parts:
 
 - **Part A:** bugs and lints in gripeline. These don't depend on modl changes.
@@ -16,9 +25,9 @@ is a *preference*, not a hard constraint. Each Part B item below says what it
 costs in compatibility.
 
 Every finding in Part A was reproduced with a probe file at the time of review.
-All 272 conformance checks passed then (`GRIPELINE=./gripeline MODL_REPO=../modl
-python3 tests/run.py`), so none of these bugs is covered by a fixture yet. Each
-fix adds one.
+All 272 conformance checks passed at review time (`GRIPELINE=./gripeline
+MODL_REPO=../modl python3 tests/run.py`); the findings were gaps in that earlier
+suite. Regression tests were added and observed failing before the fixes.
 
 ---
 
@@ -38,7 +47,7 @@ The dot twin `a:err -> b` has the same bug. The pipe branch in
 records `pipe_succ`/`pipe_pred` without looking at `tail_port`/`head_port`.
 `extra_fd_routing.case` only covers a file head.
 
-**Fix (semantics to confirm, see Open questions):** use process substitution
+**Original proposed fix (final semantics recorded below):** use process substitution
 for any non-default fd. It is order-independent, so it fits the "routing, not
 dup ordering" rule in SPEC §5:
 
@@ -155,8 +164,8 @@ to the raw `label`. The same applies to the `solid_control` lint
 ## Part B — modl enhancements (general purpose)
 
 Each item is useful to modl on its own, not only to gripeline. **Compat** says
-whether an existing valid file changes meaning. **gripeline** says how
-gripeline would use it. Grammar items change modl's hash-locked parser, so each
+whether an existing valid file changes meaning. **gripeline** records the integration proposed at review time; the final
+decisions below record the implemented choices. Grammar items change modl's hash-locked parser, so each
 one needs `engine-integrity.json` regenerated, `npm test`, `npm run check`, the
 browser tests, and a docs-src page.
 
@@ -208,7 +217,7 @@ each -> tee
   illegal today), which is uglier. Decide before implementing.
 - **Layout:** members are laid out inside the box; the box auto-sizes.
 - **gripeline:** replaces `#gl begin`/`#gl end` and the stand-in node. The
-  group's text can be the loop header (the open question in MODL_PLAN §9),
+  group's text supplies the loop header (resolving MODL_PLAN §9),
   and `#gl role=` on the `{` line sets subshell/group/function. Keep
   `#gl begin` as a deprecated alias for one release.
 
@@ -285,13 +294,13 @@ block. It becomes worth doing once B2/B3 take over most pragma uses.
 
 ---
 
-## Order of work
+## Completed implementation sequence
 
 | step | repo      | content                                                     | size |
 |------|-----------|-------------------------------------------------------------|------|
 | 1    | gripeline | A2, A3, A5, A6, A7, A8 + fixtures                           | S–M  |
 | 2    | gripeline | A4 (synthetic-id mapping)                                   | M    |
-| 3    | gripeline | A1 once its semantics are decided; SPEC §5                  | M    |
+| 3    | gripeline | A1 process substitutions; SPEC §5                          | M    |
 | 4    | modl      | B1 parser module + spans; switch `modl_parse.cjs` over      | S–M  |
 | 5    | modl      | B2 ports → gripeline reads `a[err]`                         | M    |
 | 6    | modl      | B8 layered layout                                           | M    |
@@ -303,17 +312,13 @@ Each gripeline step keeps `python3 tests/run.py` green, and dot output stays
 byte-identical except where A1 deliberately changes it. Each modl grammar step
 adds parity fixtures to gripeline's `tests/` and reruns the modl parity check.
 
-## Open questions
+## Resolved questions
 
-1. **A1 semantics:** process substitution (`a 2> >(b)`) as proposed; or
-   `a 2>&1 >/dev/null | b` / `a |& b`; or make non-default ports between
-   programs an error for now?
-2. **B3 syntax:** `ID … {` / `}` (reads well, tiny compat cost) or `[ID]` /
-   `[/ID]` (fully compatible)?
-3. **B4:** once `note` exists, should `hex` stay as an alias for file, or be
-   freed up?
-4. **B5:** should `double` mean stderr in gripeline, or stay a plain data edge
-   with stderr still needing a pragma or port?
+1. A1 uses process substitution, including two non-default endpoints. Bash
+   does not wait for substitution children; ambiguous/shared nesting reports E09.
+2. B3 uses `ID … {` / `}`. Legacy pragma blocks remain aliases for this release.
+3. B4 retains `hex` as a file alias alongside `note` and `cylinder`.
+4. B5 makes `double` route stderr unless an explicit port overrides it.
 
 ## Implementation decisions and verification
 
@@ -329,10 +334,13 @@ adds parity fixtures to gripeline's `tests/` and reruns the modl parity check.
 - B6 uses full text on hover/focus; B7 adds a persistent raw-text view.
 - B10 highlights pragmas in a preview beneath the source editor.
 - Grammar compatibility costs are documented in SPEC §14.4 and modl's new
-  docs-src/pipeline-features.html. CI must consume the companion modl change
-  before the new parser/parity fixtures can pass against the remote checkout.
+  docs-src/pipeline-features.html. A checkout used for parity must include
+  those companion changes. The current
+  local checkout prerequisite is tracked in [todo/MODL_PARITY.md](../todo/MODL_PARITY.md);
+  this record does not establish the current remote CI state.
 
-Regression tests were run failing before the Part A fixes. Final checks cover
+Verification recorded on 2026-11-07: regression tests were run failing before
+the Part A fixes. Final checks covered
 conformance, parser parity, modl unit/integrity/generated-asset checks, native
 Chromium/WebKit browser tests and shared fragment-kit contracts. Firefox could
 not launch its temporary profile in this environment.

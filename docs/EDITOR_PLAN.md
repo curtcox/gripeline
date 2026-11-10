@@ -1,8 +1,8 @@
-# Editor and run-anywhere plan
+# Completed: editor and portable execution
 
-Status: **implemented and deployed** (2026-11-07). All six phases meet their
-acceptance criteria. Changes are committed across gripeline, modl, 256t.org,
-apptron and hashbin.org. The canonical editor is
+Status: **implemented and deployed**, as recorded on 2026-11-07. All six
+phases were recorded as meeting their acceptance criteria. Changes were
+committed across gripeline, modl, 256t.org, apptron and hashbin.org. The canonical editor is
 [gripeline.hashbin.page](https://gripeline.hashbin.page/); Pages retains the
 spec, conformance results and a recovery mirror.
 
@@ -15,7 +15,17 @@ spec, conformance results and a recovery mirror.
 | 4 | Registered canonical Publish client, in-tab review with verified source restoration, CID loads/commands, large Apptron snapshot fallback and source-only mirror recovery. The approved real $0.01 one-month save returned its expected CID; Linux/macOS/Windows CI each downloaded and ran that saved diagram with output `6`. Old work and fractional positions survive live recovery; credentials are excluded. |
 | 5 | requires/env declarations, missing-tool guards, --portable advice, command inventories and environment badges. All three native platforms and the real VM pass the portable gallery, saved-envelope execution and tamper rejection. |
 
-Verification: `make check` (89 fixtures, 49 unit tests), site build, 55 pinned
+Reviewed against the checkout on 2026-11-10. This is a completion record;
+remaining work is indexed in [todo/README.md](../todo/README.md). The phase and
+verification counts in this record describe the 2026-11-07 acceptance run, not a fresh
+remote deployment check. The subsequent compact-interface update uses
+Fragment Kit 0.3.5, compact controls, full workspace views and a scrollable
+More menu with a fixed Close control (recorded in commits `9120f67` and
+`9235d08`). Earlier references to Fragment Kit 0.3.4 describe the initial build.
+Apptron's canonical handoff origin is `https://apptron.hashbin.page/`;
+the dedicated gripeline origin is already selected and registered.
+
+Verification recorded on 2026-11-07: `make check` (89 fixtures, 49 unit tests), site build, 55 pinned
 vendor files, 10 Node contracts, 26 local Chromium/WebKit tests and 39 Linux
 browser checks. Graphviz and sibling MODL parity tools run locally. macOS/Windows
 CI use the documented Graphviz brace fallback; Windows skips the POSIX-stub
@@ -31,6 +41,14 @@ was approved for one month of retention. Normal CI uses local stores and never
 depends on this expiring public CID; manual `published_cid` acceptance validates
 that downloaded source is exactly the reviewed portable count fixture before
 execution.
+
+## Original accepted design (completed)
+
+The following brief preserves the design rationale and phase acceptance
+criteria. Tasks and dependencies here describe work already completed; the
+implementation decisions in §9 record the final outcomes. Current user and
+operational instructions are in [README.md](../README.md),
+[web/README.md](../web/README.md) and [SPEC.md](../SPEC.md).
 
 Goal: the gripeline site lets you **construct, view, and run** gripeline
 diagrams.
@@ -193,9 +211,9 @@ opens their diagram in the editor, alongside the existing modl link.
   opens in modl and the reverse. CID links (`#<CID>`) load through HashBin with
   verification.
 - **Run → Apptron:** builds a txtar snapshot and opens
-  `https://curtcox.github.io/apptron/?compressed=…` in a new tab, where the
+  `https://apptron.hashbin.page/?compressed=…` in a new tab, where the
   user presses Run (§7). If the link would be too long, it offers to save to
-  HashBin and opens `…/apptron/#CID` instead.
+  HashBin and opens `https://apptron.hashbin.page/#CID` instead.
 - **Run → Locally:** shows the bash first, then commands to copy for
   bash/zsh, PowerShell, and cmd:
   - `gripeline run 't256:CID'` once the diagram is saved by CID. t256 verifies
@@ -278,9 +296,10 @@ python3 gripeline.py check pipeline.modl && echo "Try: python3 gripeline.py run 
   in the browser and embeds them in the snapshot's local store, within the
   1 MiB cap. Past the cap, it says so and suggests a relay, which apptron
   already supports under More → Network.
-- **Same-origin note:** the editor and apptron share `curtcox.github.io`, but
-  the editor only *links* to apptron (new tab). There's no iframe, so apptron's
-  COOP/COEP service-worker setup is untouched.
+- **Origin decision:** canonical gripeline and Apptron use separate
+  `hashbin.page` origins. The Pages mirror shares `curtcox.github.io` with the
+  legacy Apptron host; the editor links to Apptron in a new tab, without an
+  iframe or changes to Apptron's COOP/COEP service-worker setup.
 
 ## 8. Phases
 

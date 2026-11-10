@@ -1,13 +1,27 @@
-# Implementation prompt — build the `gripeline` transpiler
+# Historical implementation brief — `gripeline` transpiler
 
-> **Historical.** This is the original brief used to build `gripeline.py`, and
-> that work is done. It is kept as a design record. It is not a task. For
-> current instructions see [AGENTS.md](AGENTS.md). For open work see
-> [MODL_REVIEW_PLAN.md](MODL_REVIEW_PLAN.md).
+> **Completed historical brief.** The original transpiler work is done.
+> Reviewed 2026-11-10. This is design context, not an active assignment. Current
+> instructions are in [AGENTS.md](../AGENTS.md), completed follow-ups are indexed
+> in [docs/README.md](README.md), and unfinished work is in
+> [todo/README.md](../todo/README.md).
+
+The two optional modes originally requested here (`--strict`, `--infer-style`)
+were never implemented; their removal from advertised options is recorded in
+[review A8](MODL_REVIEW_PLAN.md). Their remaining disposition is tracked in
+[todo/CLI_MODES.md](../todo/CLI_MODES.md), rather than counted as delivered.
+
+The brief below describes the original scope. Later work added E13/E14, native
+modl extensions, stdin/CID loading through t256, requirements/environment
+metadata, portable advice, the pure `gripeline_api`, and the browser editor.
+See [SPEC.md](../SPEC.md) and the [editor record](EDITOR_PLAN.md) for those
+completed additions. The original E01–E12 list is not the current full list.
+
+## Original brief (completed scope)
 
 You are implementing **gripeline**, a transpiler that turns an ordinary Graphviz
 `dot` file or [`modl`](https://modl.hashbin.page/) diagram into a `bash` script.
-The full language is defined in [`SPEC.md`](SPEC.md) (Draft 0.4). Read it end to
+The full language is defined in [`SPEC.md`](../SPEC.md) (Draft 0.4). Read it end to
 end before writing code — the emitted bash is the *normative* meaning of a
 graph, so the spec is the authority, and this prompt only orients you and pins
 down the contract.
@@ -16,7 +30,7 @@ down the contract.
 
 Produce a single, self-contained **Python 3 (standard library only)** program,
 `gripeline.py`, plus an executable `gripeline` shim, that passes the conformance
-harness in [`tests/`](tests/) and implements the spec in full (§§4–9, §14) for
+harness in [`tests/`](../tests/) and implements the spec in full (§§4–9, §14) for
 both `dot` and `modl`. No third-party packages, no `pip install`, no
 `pydot`/`graphviz` — write your own `dot` and `modl` parsers.
 
@@ -58,7 +72,7 @@ than editing it.
   (static check failed); other non-zero codes from `run` propagate the
   pipeline's status.
 
-## CLI surface (implement all of it)
+## Original CLI surface (implemented core)
 
 ```
 gripeline build  <file.dot|file.modl|url>   # print transpiled bash to stdout (harness uses this)
@@ -66,8 +80,6 @@ gripeline run    <file.dot|file.modl|url>   # transpile then exec under bash; pr
 gripeline check  <file.dot|file.modl|url>   # run only the §9 static check; exit 0 or 65
   --lang=dot|modl                           # override file-extension / token format detection
   --annotate[=out]                          # also write a diagnostic-annotated .dot or .modl copy (§9, §14.3)
-  --strict                                  # ordering ambiguity (multiple valid topo orders) is an error
-  --infer-style                             # also read the recommended visual conventions (§3); OFF by default
 ```
 Default prologue is `set -euo pipefail`, overridable by the graph attribute
 `gl_prologue` (or `#gl prologue="…"` in `modl`). `build` should emit the

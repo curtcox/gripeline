@@ -44,7 +44,9 @@ Only the canonical origin may publish; its public client ID must be registered
 for `https://gripeline.hashbin.page/`. The issued public client is
 `app_dc8bf51a-ebee-4ef0-879e-1cccbfc1a01b`. A missing registration keeps Save disabled.
 The shared recovery adapter accepts only source, finite positions and draft history.
-It retains the old copy and rejects credential or execution settings. See `../EDITOR_PLAN.md` for status.
+It retains the old copy and rejects credential or execution settings. See the
+[completed editor record](../docs/EDITOR_PLAN.md) for acceptance evidence and
+[todo/](../todo/README.md) for outstanding work.
 
 
 Optional live VM acceptance (requires network and downloads the real runtime):

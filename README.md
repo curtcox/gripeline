@@ -31,6 +31,9 @@ log -> g -> w
 - **[tests/](tests/)** — a conformance harness and fixtures (including dot/modl
   twin cases) that validate a transpiler (`python3 tests/run.py`). See
   [tests/README.md](tests/README.md).
+- **[docs/](docs/README.md)** — completed implementation and design records.
+- **[todo/](todo/README.md)** — outstanding work and deferred proposals, with
+  status and completion checks.
 
 Status: working transpiler for both `dot` and `modl`.
 [`gripeline.py`](gripeline.py) (Python 3, standard library only) parses real
@@ -119,7 +122,8 @@ The canonical editor is live at [gripeline.hashbin.page](https://gripeline.hashb
 HashBin save controls use hosted per-save review and verify the returned CID.
 Publishing is enabled on the registered canonical origin; the shared Pages mirror
 always disables publishing. Oversized Apptron links can be downloaded
-as snapshots or saved for an Apptron CID handoff. See [EDITOR_PLAN.md](EDITOR_PLAN.md) for current phase status.
+as snapshots or saved for an Apptron CID handoff. All six editor phases are
+recorded as complete in the [editor implementation record](docs/EDITOR_PLAN.md).
 
 The editor's environment badges combine declared requirements with first command
 words. Baseline inventories are in `web/portable-tools.json`; native targets

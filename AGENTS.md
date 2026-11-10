@@ -11,7 +11,7 @@ pipeline.
 ## Verify your change
 
 ```bash
-make check                 # conformance fixtures + unit tests (same as CI's test job)
+make check                 # conformance fixtures + unit tests
 make test FILTER=fanin     # only fixtures whose name contains "fanin"
 make units                 # unit tests only
 ```
@@ -34,8 +34,17 @@ skipped:
 | `node` + `../modl` (a `curtcox/modl` checkout) | modl parity checks skip | gripeline's modl parse must match modl's own parser exactly |
 
 The Makefile sets `MODL_REPO=../modl` automatically if that checkout exists.
+It currently detects `js/editor.js`; the checkout must also contain the
+standalone `js/parse.js` and current vocabulary/corpus files. An old checkout
+can therefore be selected and fail parity instead of skipping it. See
+[todo/MODL_PARITY.md](todo/MODL_PARITY.md) for the local verification gap.
+To intentionally run without optional parity, use `make check MODL_REPO=`
+and report that omission; it does not establish parser parity.
 CI ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)) installs
-both tools and runs on Python 3.12, so keep code compatible with 3.12.
+both tools on Linux and runs the core suite on Linux, macOS and Windows with
+Python 3.12, so keep code compatible with 3.12. CI also runs native portability
+and installer checks and a separate editor browser job; `make check` covers
+the conformance and unit suites only.
 
 Other useful commands:
 
@@ -62,7 +71,7 @@ python3 site/build.py                          # build the Pages site into site/
 5. **Every bug fix adds a fixture** (or a unit test in
    [`tests/test_units.py`](tests/test_units.py) when a `.case` file can't
    express it). Write it first and watch it fail.
-6. **gripeline's modl parser must match modl's parser** (`js/editor.js` in
+6. **gripeline's modl parser must match modl's parser** (`js/parse.js` in
    `curtcox/modl`) token for token. Port modl's behavior; don't reinterpret
    it.
 7. **modl's grammar may change.** Keeping existing `.modl` files valid with the
@@ -73,19 +82,36 @@ python3 site/build.py                          # build the Pages site into site/
 
 | path | what it is |
 |---|---|
-| [`gripeline.py`](gripeline.py) | the whole transpiler: one file, about 2,300 lines |
+| [`gripeline.py`](gripeline.py) | the whole transpiler, including the pure browser API, in one standard-library Python file |
 | [`gripeline`](gripeline) | bash shim: `exec python3 gripeline.py "$@"` |
 | [`SPEC.md`](SPEC.md) | language spec (Draft 0.4). §9 = static checks, §12 = example gallery, §14 = modl front end and `#gl` pragmas |
 | [`tests/run.py`](tests/run.py) | conformance harness. Runs every `tests/cases/**/*.case` |
 | [`tests/README.md`](tests/README.md) | **`.case` file format**, expect modes, and the checks. Read it before adding fixtures |
 | [`tests/cases/`](tests/cases/) | success fixtures; names start with the SPEC section (`12_04_…`), `modl_…`, `extra_…`, or `run_…` |
-| [`tests/cases/errors/`](tests/cases/errors/) | one fixture per static-check error (`E01_…`–`E13_…`, `modl_parse_…`) |
+| [`tests/cases/errors/`](tests/cases/errors/) | static-check error fixtures (`E01_…`–`E14_…`) and modl parse errors |
 | [`tests/test_units.py`](tests/test_units.py) | stdlib `unittest`: annotate, id quoting, sniffing, share links, modl parity corpus |
 | [`tests/modl_parse.cjs`](tests/modl_parse.cjs) | runs modl's real parser from `$MODL_REPO` for parity checks |
 | [`site/build.py`](site/build.py) | builds the GitHub Pages site (spec with rendered SVGs + per-test pages) |
-| [`MODL_REVIEW_PLAN.md`](MODL_REVIEW_PLAN.md) | implementation record: Part A fixes and Part B modl enhancements (implemented in the sibling modl checkout) |
-| [`MODL_PLAN.md`](MODL_PLAN.md) | design record for the modl front end. Implemented. Decision 1 is superseded |
-| [`IMPLEMENTATION_PROMPT.md`](IMPLEMENTATION_PROMPT.md) | the original brief used to build the transpiler. **Historical**: the work is done. Don't treat its "You are implementing…" as your task |
+| [`docs/`](docs/README.md) | completed work and design records: original transpiler brief, modl front end/review, editor and portable execution |
+| [`todo/`](todo/README.md) | unfinished work and deferred proposals, each with its status and completion check |
+
+## Plans and completion records
+
+- Start with [todo/README.md](todo/README.md) when looking for outstanding work.
+  Deferred proposals are not automatically authorized implementation tasks.
+- Put new plans for unfinished work in `todo/`, with status, dependencies and
+  concrete completion checks. Keep the index current.
+- Put completed outcomes, decisions, compatibility costs and verification
+  evidence in `docs/`. Move a finished plan there and update both indexes and
+  incoming links. For partial completion, split the completed record from the
+  remaining work and link them in both directions.
+- Do not leave unchecked tasks or unresolved questions in completed records.
+  Mark superseded decisions and date historical test/deployment evidence;
+  preserve useful rationale without presenting old instructions as new work.
+- `SPEC.md` remains normative and stays at the root. Keep section READMEs near
+  their code. `docs/` and `todo/` organize plans and records, not all Markdown.
+- The original briefs in `docs/` contain historical implementation language.
+  Do not treat their "You are implementing…" text as a current assignment.
 
 ## Code map of `gripeline.py`
 
@@ -94,7 +120,7 @@ to find them. In pipeline order:
 
 1. **Tokenizer (dot)**: `Tok`, `tokenize`.
 2. **AST / model**: `Node`, `Edge`, `Cluster`, `Model`, `GripError`. The modl
-   vocabulary tables (sizes, shapes, colors) must match modl's `js/editor.js`.
+   vocabulary tables (sizes, shapes, colors) must match modl's `js/parse.js`.
    `test_vocabulary_matches_modl` enforces this.
 3. **Parser (dot front end)**: `Parser`, `parse_dot`. Handles subgraphs,
    ports, and attribute defaults that cascade.
@@ -103,13 +129,14 @@ to find them. In pipeline order:
    pragma parsing is here.
 5. **Port / fd helpers**: `port_to_fd`.
 6. **Engine**: `Engine` resolves roles (`role_of`, `edge_kind`), runs the §9
-   checks (`run_checks`, error codes `E01`–`E13`), and emits bash
+   checks (`run_checks`, error codes `E01`–`E14`), and emits bash
    (`transpile`, `dataflow_transform`, `process_scope`, `render_cluster`).
    Most semantic bugs are here.
 7. **Small utilities**: `UnionFind`, `topo` (ordering is stable and ties go
    to source order), `find_cycle`.
 8. **Front-end dispatcher**: share-link decode/encode, `detect_lang`,
-   `parse_source`, `build_engine`, `emit_diagnostics`, `annotate`, `main` (CLI).
+   `parse_source`, `build_engine`, `gripeline_api` (pure browser/CLI evaluation),
+   `emit_diagnostics`, `annotate`, `main` (CLI).
 
 ## Contracts that are easy to break
 
@@ -130,8 +157,9 @@ to find them. In pipeline order:
 
 - **Fix a bug:** reproduce it with a small `.dot` or `.modl` file and
   `./gripeline build`. Add a fixture that fails, fix the bug in `Engine` or the
-  front end, then run `make check`. If you're fixing a `MODL_REVIEW_PLAN.md`
-  item, mark it done there.
+  front end, then run `make check`. If the fix addresses a `todo/` item, move
+  the completed portion and its verification evidence to `docs/` and update
+  the indexes. The completed modl review is historical, not the backlog.
 - **Add a fixture:** copy the closest existing `.case`. No registration needed.
   Prefer twin dot+modl cases. Use `expect: bash` when the output is
   deterministic, and `contains` for implementation-defined formatting.
@@ -140,7 +168,9 @@ to find them. In pipeline order:
 - **Change the CLI:** update the module docstring in `gripeline.py`, the CLI
   block in `README.md`, and this file.
 - **Docs:** keep `README.md`, `tests/README.md`, and `site/README.md`
-  consistent with any behavior you change. The site is built from them in CI.
+  consistent with any behavior you change. The site uses the root README and
+  SPEC plus the conformance fixtures; update moved-document links throughout
+  the repository as well as the `docs/` and `todo/` indexes.
 
 ## Git
 
