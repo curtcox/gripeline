@@ -54,6 +54,32 @@ def words(line: str) -> list[gl.ModlPiece]:
     return [p for p in gl._lex_modl_line(line) if p.kind == "word"]
 
 
+class UnsupportedCliModes(unittest.TestCase):
+    def assert_mode_rejected(self, flag):
+        from unittest.mock import patch
+        for args in ((flag, 'build', '-'), ('build', flag, '-'),
+                     ('build', '-', flag), ('check', '-', flag),
+                     ('run', '-', flag), ('-', flag)):
+            for source in ('digraph { a [label="echo hi"] }', 'a square echo hi'):
+                with self.subTest(args=args, source=source), patch(
+                    'gripeline.read_input_source', return_value=source
+                ) as read, patch('gripeline.subprocess.run', return_value=
+                                subprocess.CompletedProcess([], 0)) as execute:
+                    code, out, err = run_cli(*args)
+                    self.assertEqual(code, 2)
+                    self.assertEqual(out, '')
+                    self.assertIn(flag, err)
+                    self.assertIn('not implemented', err)
+                    read.assert_not_called()
+                    execute.assert_not_called()
+
+    def test_strict_is_rejected(self):
+        self.assert_mode_rejected('--strict')
+
+    def test_infer_style_is_rejected(self):
+        self.assert_mode_rejected('--infer-style')
+
+
 # --------------------------------------------------------------------------
 # Lexer edge cases: each must parse the same in gripeline and in modl.
 # --------------------------------------------------------------------------

@@ -18,8 +18,8 @@ Current decisions superseding the original brief below:
 - `#gl` is case-sensitive. Whole-line settings target the graph even inside
   a block; trailing opener pragmas set block attributes.
 - Parity imports modl's standalone `js/parse.js`, replacing the proposed
-  parser-export script. The [local parity prerequisite](../todo/MODL_PARITY.md)
-  remains outstanding for this workspace's old sibling checkout.
+  parser-export script. [Local parity verification](MODL_PARITY.md) passed
+  against a separate compatible checkout; the older sibling needs an override.
 - CID inputs now use verified native `t256 load`; they are no longer refused.
   The gripeline browser editor provides Bash preview using the real Python
   compiler. A separate [modl-side preview](../todo/MODL_EDITOR.md) stays deferred.

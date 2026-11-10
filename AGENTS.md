@@ -36,8 +36,9 @@ skipped:
 The Makefile sets `MODL_REPO=../modl` automatically if that checkout exists.
 It currently detects `js/editor.js`; the checkout must also contain the
 standalone `js/parse.js` and current vocabulary/corpus files. An old checkout
-can therefore be selected and fail parity instead of skipping it. See
-[todo/MODL_PARITY.md](todo/MODL_PARITY.md) for the local verification gap.
+can therefore be selected and fail parity instead of skipping it. Set
+`MODL_REPO` to a compatible checkout; see the verified revision and command in
+[docs/MODL_PARITY.md](docs/MODL_PARITY.md). The older sibling was left unchanged.
 To intentionally run without optional parity, use `make check MODL_REPO=`
 and report that omission; it does not establish parser parity.
 CI ([`.github/workflows/pages.yml`](.github/workflows/pages.yml)) installs
@@ -181,6 +182,10 @@ to find them. In pipeline order:
 - `site/_site/` is build output and is gitignored. Never commit it.
 
 ## Editor and additional CLI options
+
+`--strict` and `--infer-style` are unsupported: all CLI commands reject them
+with exit 2 before reading input or running a pipeline. They previously did
+nothing; default source ordering and explicit role/edge semantics still apply.
 
 `web/` is copied into the generated site's `editor/` directory, together with
 `gripeline.py`. `scripts/vendor.py` verifies browser assets against

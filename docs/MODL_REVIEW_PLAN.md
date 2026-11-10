@@ -5,11 +5,11 @@ gripeline and the companion modl working tree.
 
 Reviewed 2026-11-10. This is a completion record. The current workspace's
 sibling checkout lacks the standalone parser; restoring local parity
-verification is tracked in [todo/MODL_PARITY.md](../todo/MODL_PARITY.md).
+verification is [complete using a separate compatible checkout](MODL_PARITY.md).
 The original findings and proposed remedies below are retained as historical
 context. The final decisions in the last section describe what shipped.
-Removing the advertised no-op flags completed A8; implementing those optional
-modes remains [deferred](../todo/CLI_MODES.md).
+Removing the advertised no-op flags completed A8; the CLI now
+[rejects both unsupported modes](CLI_MODES.md) with exit 2.
 
 This plan comes from a review of the modl front end in
 [`gripeline.py`](../gripeline.py) (written after [MODL_PLAN.md](MODL_PLAN.md)
@@ -335,8 +335,8 @@ adds parity fixtures to gripeline's `tests/` and reruns the modl parity check.
 - B10 highlights pragmas in a preview beneath the source editor.
 - Grammar compatibility costs are documented in SPEC §14.4 and modl's new
   docs-src/pipeline-features.html. A checkout used for parity must include
-  those companion changes. The current
-  local checkout prerequisite is tracked in [todo/MODL_PARITY.md](../todo/MODL_PARITY.md);
+  those companion changes. Fresh
+  [local parity verification](MODL_PARITY.md) used a separate compatible checkout;
   this record does not establish the current remote CI state.
 
 Verification recorded on 2026-11-07: regression tests were run failing before

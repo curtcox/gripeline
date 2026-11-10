@@ -40,7 +40,7 @@ The current modl parity checks import `js/parse.js` from the modl checkout.
 Use a compatible checkout containing the companion changes recorded in
 [docs/MODL_REVIEW_PLAN.md](../docs/MODL_REVIEW_PLAN.md) when building locally.
 The old sibling checkout in this workspace lacks that parser; see the
-[local parity prerequisite](../todo/MODL_PARITY.md).
+[verified compatible revision and local parity results](../docs/MODL_PARITY.md).
 
 The build copies public files from `web/` and the current `gripeline.py` to `_site/editor/`
 and generates `editor/gallery.json` from every fixture source. Browser runtime

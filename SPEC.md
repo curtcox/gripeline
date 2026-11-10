@@ -158,7 +158,8 @@ what it does:
 | redirect to file   | *(file node endpoint)* | `style=bold`                   |
 
 An implementation MAY offer a `--infer-style` mode that *also* reads the visual
-convention, but conforming default behavior reads only `gl_*` + topology.
+convention, but conforming default behavior reads only `gl_*` + topology. The
+current CLI rejects this unsupported mode (§14.4).
 
 ---
 
@@ -500,9 +501,9 @@ and adds a `wait` at the join. This keeps the common case reproducible while
 leaving an explicit opt-in for parallel fan-out.
 
 **Ordering ambiguity (resolved, §13):** when several topological orders are
-valid, the transpiler picks a **deterministic order = source order**. Running
-with `--strict` instead makes ambiguity an error, forcing the author to add
-enough control edges to disambiguate.
+valid, the transpiler picks a **deterministic order = source order**. Add
+control edges to require a different order. The proposed `--strict` mode is
+not implemented; the CLI rejects it (§14.4).
 
 ### 6.2 Grouping — subshells, brace groups, functions
 
@@ -1192,7 +1193,7 @@ the sections noted:
 2. **Concurrency** (§6.1) — independent nodes run *sequentially in source order*;
    `gl_async=true` opts a node into background execution (`&` + `wait`).
 3. **Ordering ambiguity** (§6.1) — resolved *deterministically by source order*;
-   `--strict` turns ambiguity into an error instead.
+   add control edges to constrain the order further. `--strict` is unsupported.
 4. **Quoting boundary** (§7, §10, §14.1 D1) — label text is emitted *literally*;
    gripeline never re-quotes. The `gl_raw` attribute is the escape hatch for
    anything the readable forms can't express.
@@ -1379,8 +1380,12 @@ IDs and `L<number>` source lines, leaving source unchanged. Exit status remains
 on hover/focus, provides a persistent raw-text view, and lays out unsaved nodes
 in deterministic left-to-right layers. Saved positions take precedence.
 
-This CLI does not advertise the unimplemented `--strict` and `--infer-style`
-options; the optional modes described elsewhere remain future capabilities.
+This CLI rejects `--strict` and `--infer-style` with exit status 2 and a
+`not implemented` diagnostic on stderr. Rejection happens before reading
+input, writing annotations, emitting Bash, or executing a pipeline, for
+`build`, `check`, `run`, and implicit `build`. These modes were previously
+accepted silently without affecting behavior; callers must remove the flags.
+Default source ordering and explicit role/edge semantics are unchanged.
 
 ### 14.5 Requirements and environments
 

@@ -47,6 +47,10 @@ Status: working transpiler for both `dot` and `modl`.
 ./gripeline run   'https://modl.hashbin.page/#h1=...'   # run a modl share link directly
 ```
 
+`--strict` and `--infer-style` are unsupported and report a CLI error (exit 2).
+Earlier versions silently ignored them. Use control edges to constrain source
+ordering and explicit `gl_*` attributes to set execution semantics.
+
 The conformance harness passes under either invocation form:
 
 ```bash

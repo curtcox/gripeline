@@ -8,8 +8,8 @@
 
 The two optional modes originally requested here (`--strict`, `--infer-style`)
 were never implemented; their removal from advertised options is recorded in
-[review A8](MODL_REVIEW_PLAN.md). Their remaining disposition is tracked in
-[todo/CLI_MODES.md](../todo/CLI_MODES.md), rather than counted as delivered.
+[review A8](MODL_REVIEW_PLAN.md). The CLI now
+[rejects both unsupported modes](CLI_MODES.md) with exit 2.
 
 The brief below describes the original scope. Later work added E13/E14, native
 modl extensions, stdin/CID loading through t256, requirements/environment

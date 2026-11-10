@@ -9,10 +9,12 @@ Reviewed against the checkout on 2026-11-10:
 
 | record | completed scope |
 |---|---|
-| [Original implementation brief](IMPLEMENTATION_PROMPT.md) | The dot/modl transpiler and its conformance contract. Historical requirements are retained; optional CLI modes were deferred. |
+| [Original implementation brief](IMPLEMENTATION_PROMPT.md) | The dot/modl transpiler and its conformance contract. Historical requirements are retained; unsupported optional CLI modes are now rejected. |
 | [modl front end](MODL_PLAN.md) | Phases 0–3: parser, pragmas, grouping, diagnostics, annotation, links and parity tests. Later native grammar extensions supersede parts of the original design. |
-| [modl review](MODL_REVIEW_PLAN.md) | A1–A8 fixes and B1–B10 enhancements, with final decisions recorded. Companion modl implementation was recorded as complete on 2026-11-07; local checkout compatibility is tracked separately. |
+| [modl review](MODL_REVIEW_PLAN.md) | A1–A8 fixes and B1–B10 enhancements, with final decisions recorded. Companion modl implementation was recorded as complete on 2026-11-07; fresh local parity evidence is recorded separately. |
 | [Editor and portable execution](EDITOR_PLAN.md) | Phases 0–5 and their recorded deployment/acceptance evidence, plus the subsequent Fragment Kit 0.3.5 interface update. |
+| [Unsupported CLI modes](CLI_MODES.md) | Reject `--strict` and `--infer-style` before input or execution, with regression coverage and compatibility notes. |
+| [Local modl parity verification](MODL_PARITY.md) | Full conformance and unit suite passed with the real parser, vocabulary and corpus at a recorded compatible modl revision. |
 
 Detailed briefs retain the original proposals for context. Their status notes
 and final decisions distinguish shipped behavior from superseded proposals;

@@ -14,6 +14,7 @@ CLI:
         --lang=dot|modl            override language detection
         --annotate[=out]           also write a diagnostic-annotated copy
         --link                     with --annotate, print a review URL to stderr
+        --strict, --infer-style   unsupported; report a CLI error (exit 2)
 """
 from __future__ import annotations
 
@@ -2532,15 +2533,14 @@ def annotate(engine: Engine, path: str, problems, out_path: str, src=None):
 
 def main(argv):
     args = argv[1:]
-    flags = {"link": False, "annotate": None, "strict": False, "infer_style": False, "lang": None, "portable": False}
+    flags = {"link": False, "annotate": None, "lang": None, "portable": False}
     rest = []
     for a in args:
         if a == "--portable":
             flags["portable"] = True
-        elif a == "--strict":
-            flags["strict"] = True
-        elif a == "--infer-style":
-            flags["infer_style"] = True
+        elif a in ("--strict", "--infer-style"):
+            print(f"gripeline: {a} is not implemented", file=sys.stderr)
+            return 2
         elif a == "--link":
             flags["link"] = True
         elif a == "--annotate":

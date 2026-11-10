@@ -40,7 +40,8 @@ MODL_REPO=../modl GRIPELINE='python3 gripeline.py' python3 tests/run.py
 ```
 
 Unit tests cover what fixtures can't: `--annotate` output, modl id quoting,
-language sniffing, share links, line splitting, edge scoping, and parity with
+unsupported CLI mode rejection before input or execution, language sniffing,
+share links, line splitting, edge scoping, and parity with
 modl's parser over modl's own examples (its gallery and docs snippets) plus a
 set of lexer edge cases. The parity tests are skipped without `MODL_REPO`:
 
