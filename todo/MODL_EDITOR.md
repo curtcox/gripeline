@@ -1,7 +1,9 @@
 # Bash preview in the separate modl editor
 
-Status: **deferred proposal, not scheduled** (reviewed 2026-11-10).
+Status: **deferred proposal, awaiting product decisions** (reviewed 2026-11-10).
 Split from §7 item 22 of the [modl front-end record](../docs/MODL_PLAN.md).
+The [open questions](OPEN_QUESTIONS.md) describe what must be specified before
+implementation.
 
 The original plan deferred a "Show bash" panel in the modl editor because it
 would need another execution path for the compiler. The completed gripeline
