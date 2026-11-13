@@ -136,6 +136,8 @@ jobs:
         working-directory: web
       - run: npm test
         working-directory: web
+      - run: for browser in chromium firefox webkit; do BROWSER="$browser" node tests/browser/ai.mjs; done
+        working-directory: web
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -143,7 +145,7 @@ jobs:
           path: web/test-results/
 
   deploy:
-    needs: build
+    needs: [build, test, editor]
     runs-on: ubuntu-latest
     environment:
       name: github-pages

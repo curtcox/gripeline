@@ -675,7 +675,7 @@ def main(argv: list[str]) -> int:
     if editor_dir.exists():
         shutil.rmtree(editor_dir)
     editor_dir.mkdir()
-    for name in ('index.html', 'service-worker.js', 'portable-tools.json', 'apptron-runtime.json', 'migration.html'):
+    for name in ('ai-comparison.json', 'ai-suite.json', 'fragment-kit.config.json', 'index.html', 'service-worker.js', 'portable-tools.json', 'apptron-runtime.json', 'migration.html'):
         shutil.copyfile(ROOT / 'web' / name, editor_dir / name)
     for name in ('src', 'vendor'):
         shutil.copytree(ROOT / 'web' / name, editor_dir / name)

@@ -1,3 +1,6 @@
+import {mountClientAi,mountGalleryAi,aiCallback} from './ai-client.js';
+import {config,type,urlState} from './fragment-config.js';
+if(aiCallback()) await new Promise(()=>{});
 import './domain-migration.js';
 import {mountPublishing} from './publishing.js';
 import {checkApptronRuntime} from './apptron-runtime.js';
@@ -9,13 +12,16 @@ import {shareLink,decode64,loadCID,unwrapDiagram} from './cid.js';
 import {localCommand,download,apptronSnapshot,apptronLink} from './run-targets.js';
 const $=id=>document.getElementById(id), source=$('source');
 const [inventory,apptronPin]=await Promise.all(['portable-tools.json','apptron-runtime.json'].map(async path=>(await fetch(path)).json()));
+let aiUI=null;
+let aiHold=new URL(location.href).searchParams.get('run')==='0';
+$('language').value=new URL(location.href).searchParams.get('lang')??'';$('portable').checked=new URL(location.href).searchParams.get('portable')!=='0';
 let targets={},compilerSource=null,apptronState={ready:false,reason:'Checking Apptron availability…'};
 let workspace,publishing,revision=0,loadRevision=0,timer,result=null,positions=Object.create(null),cid=null;
 const worker=new Worker(new URL('./transpile.js',import.meta.url),{type:'module'});
 const report=text=>{$('diagnostics').textContent=text;};
 function invalidate() {result=null;revision++;$('run-dialog').close();$('bash').textContent='';for(const id of ['local','apptron','download-bash'])$(id).disabled=true;}
-function check(){invalidate();$('status').textContent='Checking…';worker.postMessage({id:revision,src:source.value,lang:$('language').value,portable:$('portable').checked});}
-function edited(){publishing?.discardSnapshot();publishing?.cancelLoad();loadRevision++;cid=null;workspace?.saveDraft();invalidate();$('status').textContent='Waiting for edit…';clearTimeout(timer);timer=setTimeout(check,250);}
+function check(){if(aiHold)return;invalidate();$('status').textContent='Checking…';worker.postMessage({id:revision,src:source.value,lang:$('language').value,portable:$('portable').checked});}
+function edited(){publishing?.discardSnapshot();publishing?.cancelLoad();loadRevision++;cid=null;workspace?.saveDraft();invalidate();$('status').textContent='Waiting for edit…';clearTimeout(timer);if(!aiHold)timer=setTimeout(check,250);}
 source.addEventListener('input',edited);$('language').onchange=edited;$('portable').onchange=edited;
 worker.onerror=event=>{invalidate();$('status').textContent='Runtime unavailable';report(event.message);};
 worker.onmessage=async({data})=>{
@@ -64,6 +70,7 @@ $('apptron').onclick=async()=>{
   catch(error){popup.close();report(error.message);if(snapshot){publishing.offerSnapshot(snapshot,reviewed);download(snapshot,'pipeline.txtar');report(error.message+' A snapshot was downloaded. On the canonical editor, More → Save Apptron snapshot offers a reviewed HashBin save and an Apptron CID link.');}}
 };
 async function loadHash(){
+  aiUI?.cancel();aiHold=new URL(location.href).searchParams.get('run')==='0';
   publishing?.cancelLoad();publishing?.discardSnapshot();
   const loading=++loadRevision;
   if(!location.hash||new URLSearchParams(location.hash.slice(1)).has('hashbin_publish'))return;
@@ -79,19 +86,25 @@ window.addEventListener('hashchange',()=>{invalidate();loadHash().then(check).ca
 try{await loadHash();check();}catch(error){invalidate();$('status').textContent='Link could not be loaded';report(error.message);}
 try{
   const response=await fetch('gallery.json');if(!response.ok)throw Error('Gallery unavailable');const gallery=await response.json();
+  await mountGalleryAi({config,type,urlState:{build:doc=>urlState.build(doc,{run:false})},container:document.querySelector('.panels'),catalog:gallery.map((item,index)=>({id:String(index),title:item.name,document:{src:item.src,gripeline:{language:item.lang,portable:true,pos:{}}}}))});
   for(const [index,item] of gallery.entries()) {const option=document.createElement('option');option.value=index;option.textContent=item.name;$('gallery').append(option);}
-  $('gallery').onchange=()=>{const item=gallery[$('gallery').value];if(!item)return;source.value=item.src;$('language').value=item.lang;positions=Object.create(null);edited();};
+  $('gallery').onchange=()=>{aiUI?.cancel();const item=gallery[$('gallery').value];if(!item)return;source.value=item.src;$('language').value=item.lang;positions=Object.create(null);edited();};
 }catch{/* Gallery is optional during local source development. */}
 
-workspace=mountWorkspace({getSnapshot:()=>({src:source.value,pos:positions}),onPreview:()=>{if(result)check();},onRestore:async value=>{publishing?.cancelLoad();publishing?.discardSnapshot();loadRevision++;cid=null;source.value=value.src;positions=value.pos;$('language').value='';check();},onLoad:async outcome=>{
+workspace=mountWorkspace({getSnapshot:()=>({src:source.value,pos:positions}),onPreview:()=>{if(result)check();},onRestore:async value=>{aiUI?.cancel();publishing?.cancelLoad();publishing?.discardSnapshot();loadRevision++;cid=null;source.value=value.src;positions=value.pos;$('language').value='';check();},onLoad:async outcome=>{
   const url=new URL(outcome.kind==='cid'?location.href:outcome.href);if(outcome.kind==='cid')url.hash=outcome.cid;
   location.hash=url.hash;
 }});
 
 publishing=mountPublishing({apptronBase:apptronPin.baseUrl,container:workspace.shell.drawer.body,getSnapshot:()=>({src:source.value,pos:positions}),onLoad:async(value,savedCid)=>{
+  aiUI?.cancel();
   loadRevision++;workspace.shell.drawer.dialog.close();workspace.opened();source.value=value.src;positions=value.pos;cid=savedCid;if(savedCid){const url=new URL(location.href);url.hash=savedCid;url.search='';history.replaceState(null,'',url);}$('language').value='';check();
 },onSaved:async(savedCid,_fingerprint,href)=>{cid=savedCid;history.replaceState(null,'',href);}});
 if(new URLSearchParams(location.hash.slice(1)).has('hashbin_publish')){
   await publishing.published(location.hash);
   if(new URLSearchParams(location.hash.slice(1)).has('hashbin_publish'))history.replaceState(null,'',location.pathname);
 }
+
+const checkButton=document.createElement('button');checkButton.id='check-now';checkButton.textContent='Check';checkButton.onclick=()=>{aiHold=false;check();};workspace.shell.toolbar.prepend(checkButton);
+const snapshot=()=>type.normalize({src:source.value,gripeline:{language:$('language').value,portable:$('portable').checked,pos:positions}});
+aiUI=await mountClientAi({config,type,urlState,getSnapshot:snapshot,getFingerprint:()=>JSON.stringify(snapshot()),container:workspace.shell.drawer.body,toolbar:workspace.shell.toolbar,status:message=>$('status').textContent=message,onApply:doc=>{aiHold=true;clearTimeout(timer);publishing.cancelLoad();publishing.discardSnapshot();loadRevision++;cid=null;invalidate();source.value=doc.src;workspace.saveDraft();$('status').textContent='Change accepted — press Check, then review the bash before running.';}});

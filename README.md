@@ -141,3 +141,5 @@ with the verified release binary.
 The Pages editor keeps **Move saved work** and **Download backup** recovery
 controls. Moving a draft keeps the old copy and transfers only source and
 positions. Recovered drafts stay unverified until you review the visible bash.
+
+Optional AI: Ask/review/undo, gallery suggestions and model comparison use the published Fragment Kit 0.4.3 entry point. See [AI guidance](docs/ai.md). Budgets start at zero; accepted source waits for explicit Run, Render or Check. The bundled synthetic [suite](web/ai-suite.json) and [75-result report](web/ai-comparison.json) measure source assertions and document invariants, not runtime quality or a model winner.

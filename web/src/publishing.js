@@ -1,4 +1,4 @@
-import {HashBinStore,HashBinPanel,createConfig,bounded} from '../vendor/fragment-kit-v0.3.5/src/index.js';
+import {HashBinStore,HashBinPanel,createConfig,bounded} from '../vendor/fragment-kit-v0.4.3/src/index.js';
 import {unwrapDiagram,loadCID} from './cid.js';
 export const canonicalOrigin='https://gripeline.hashbin.page/';
 export function normalizeSnapshot(value) {
@@ -19,7 +19,7 @@ export function parseSnapshot(payload) {
 }
 export function createDiagramStore({config, ...options}) {
   const type={type:'gripeline',fileName:'pipeline.json',contentType:'application/json',normalize:normalizeSnapshot};
-  const loadSDK=options.loadSDK??(()=>import('../vendor/fragment-kit-v0.3.5/vendor/hashbin-sdk-v0.4.0.mjs'));
+  const loadSDK=options.loadSDK??(()=>import('../vendor/fragment-kit-v0.4.3/vendor/hashbin-sdk-v0.4.0.mjs'));
   const store=new HashBinStore({config,type,...options,loadSDK:async()=>{
     const sdk=await loadSDK();
     return{...sdk,HashBinClient:class extends sdk.HashBinClient{

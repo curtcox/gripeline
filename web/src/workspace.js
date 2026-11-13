@@ -1,4 +1,4 @@
-import {createConfig,createShell,mountMobileTabs,createShareDialog,createQrDialog,OfflineClient,LocalDrafts,createStorage} from '../vendor/fragment-kit-v0.3.5/src/index.js';
+import {createConfig,createShell,mountMobileTabs,createShareDialog,createQrDialog,OfflineClient,LocalDrafts,createStorage} from '../vendor/fragment-kit-v0.4.3/src/index.js';
 import {shareLink,decode64,unwrapDiagram,parseCID} from './cid.js';
 export function mountWorkspace({getSnapshot,onLoad,onPreview,onRestore}) {
   const current=new URL(location.href);current.hash='';current.search='';current.pathname=current.pathname.replace(/index\.html$/,'');

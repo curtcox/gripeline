@@ -2,7 +2,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/contracts.mjs && playwright test"
+    "test": "node --test tests/ai.test.mjs && node --test tests/contracts.mjs && playwright test",
+    "test:ai:browser": "node tests/browser/ai.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"
