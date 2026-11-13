@@ -28,7 +28,9 @@ try{
  await page.evaluate(()=>dispatchEvent(new PopStateEvent('popstate')));await page.waitForTimeout(100);assert.equal(await page.getByRole('button',{name:'Accept change',exact:true}).isVisible(),false);
  assert.equal(paidRequests,0);console.log(engine+': '+slug+' accept/undo/draft/explicit-run/navigation/no-paid-load passed');
  await page.setViewportSize({width:360,height:800});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Editor must fit a 360px phone');
- if(slug!=='gripeline'){
+ if(slug==='gripeline'){
+  await page.locator('#gripeline-ai .fk-close').click();await page.getByRole('button',{name:'More',exact:true}).click();await page.getByLabel('What do you want to make?',{exact:true}).fill('diagram');await page.getByRole('button',{name:'Find a starting point'}).click();await page.locator('#ai-starting-point a').first().waitFor();assert.equal(await page.getByLabel('Model reference',{exact:true}).count(),1);
+ }else{
   await page.goto(base+'gallery.html');await page.getByLabel('What do you want to make?',{exact:true}).fill('example');await page.getByRole('button',{name:'Find a starting point'}).click();await page.locator('#ai-starting-point a').first().waitFor();assert.ok(await page.locator('.fk-gallery-filters input').count());
   await page.setViewportSize({width:360,height:800});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Gallery must fit a 360px phone');
  }

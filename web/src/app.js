@@ -1,4 +1,5 @@
-import {mountClientAi,mountGalleryAi,aiCallback} from './ai-client.js';
+import {createSampleChooser} from '../vendor/fragment-kit-v0.4.3/src/ai/index.js';
+import {mountClientAi,aiCallback} from './ai-client.js';
 import {config,type,urlState} from './fragment-config.js';
 if(aiCallback()) await new Promise(()=>{});
 import './domain-migration.js';
@@ -12,7 +13,7 @@ import {shareLink,decode64,loadCID,unwrapDiagram} from './cid.js';
 import {localCommand,download,apptronSnapshot,apptronLink} from './run-targets.js';
 const $=id=>document.getElementById(id), source=$('source');
 const [inventory,apptronPin]=await Promise.all(['portable-tools.json','apptron-runtime.json'].map(async path=>(await fetch(path)).json()));
-let aiUI=null;
+let aiUI=null,aiCatalog=[];
 let aiHold=new URL(location.href).searchParams.get('run')==='0';
 $('language').value=new URL(location.href).searchParams.get('lang')??'';$('portable').checked=new URL(location.href).searchParams.get('portable')!=='0';
 let targets={},compilerSource=null,apptronState={ready:false,reason:'Checking Apptron availability…'};
@@ -86,7 +87,7 @@ window.addEventListener('hashchange',()=>{invalidate();loadHash().then(check).ca
 try{await loadHash();check();}catch(error){invalidate();$('status').textContent='Link could not be loaded';report(error.message);}
 try{
   const response=await fetch('gallery.json');if(!response.ok)throw Error('Gallery unavailable');const gallery=await response.json();
-  await mountGalleryAi({config,type,urlState:{build:doc=>urlState.build(doc,{run:false})},container:document.querySelector('.panels'),catalog:gallery.map((item,index)=>({id:String(index),title:item.name,document:{src:item.src,gripeline:{language:item.lang,portable:true,pos:{}}}}))});
+  aiCatalog=gallery.map((item,index)=>({id:String(index),title:item.name,document:{src:item.src,gripeline:{language:item.lang,portable:true,pos:{}}}}));
   for(const [index,item] of gallery.entries()) {const option=document.createElement('option');option.value=index;option.textContent=item.name;$('gallery').append(option);}
   $('gallery').onchange=()=>{aiUI?.cancel();const item=gallery[$('gallery').value];if(!item)return;source.value=item.src;$('language').value=item.lang;positions=Object.create(null);edited();};
 }catch{/* Gallery is optional during local source development. */}
@@ -108,3 +109,7 @@ if(new URLSearchParams(location.hash.slice(1)).has('hashbin_publish')){
 const checkButton=document.createElement('button');checkButton.id='check-now';checkButton.textContent='Check';checkButton.onclick=()=>{aiHold=false;check();};workspace.shell.toolbar.prepend(checkButton);
 const snapshot=()=>type.normalize({src:source.value,gripeline:{language:$('language').value,portable:$('portable').checked,pos:positions}});
 aiUI=await mountClientAi({config,type,urlState,getSnapshot:snapshot,getFingerprint:()=>JSON.stringify(snapshot()),container:workspace.shell.drawer.body,toolbar:workspace.shell.toolbar,status:message=>$('status').textContent=message,onApply:doc=>{aiHold=true;clearTimeout(timer);publishing.cancelLoad();publishing.discardSnapshot();loadRevision++;cid=null;invalidate();source.value=doc.src;workspace.saveDraft();$('status').textContent='Change accepted — press Check, then review the bash before running.';}});
+
+const chooser=createSampleChooser({ai:aiUI?.ai,catalog:aiCatalog,urlState:{build:doc=>urlState.build(doc,{run:false})},container:workspace.shell.drawer.body});
+chooser.section.id='ai-starting-point';
+workspace.shell.header.querySelector('.fk-more').addEventListener('click',()=>void chooser.refresh());addEventListener('pagehide',()=>chooser.destroy(),{once:true});
